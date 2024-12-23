@@ -8,32 +8,39 @@ import logging
 logger = logging.getLogger(__name__)
 
 @shared_task(bind=True)
-def import_city_data(self, city_name: str, parent_task_id: str = None):
+def import_city_data(self, city_name: str, root_city_name: str = None, parent_task_id: str = None):
     """
-    Import POIs for a city. Can be chained with other city imports for districts.
+    Import POIs for a city or district.
+    city_name: The page to scrape
+    root_city_name: The main city these POIs belong to (same as city_name for root tasks)
+    parent_task_id: ID of the parent task (None for root tasks)
     """
     logger.info(f"Starting import task for {city_name}")
     try:
         scraper = WikivoyageScraper()
-        pois = scraper.get_city_data(city_name)
+        pois, district_pages = scraper.get_city_data(city_name)
         
         with transaction.atomic():
-            # Create/update city
+            # For root task, use city_name as root_city_name
+            if not root_city_name:
+                root_city_name = city_name
+            
+            # Create/update the root city
             city, created = City.objects.get_or_create(
-                name=city_name,
+                name=root_city_name,
                 defaults={'country': 'Unknown'}
             )
             
-            # If this is a root task (no parent), clear existing POIs
+            # Only clear existing POIs if this is a root task
             if not parent_task_id:
                 city.points_of_interest.all().delete()
             
-            # Create new POIs
+            # Create new POIs, all associated with the root city
             db_pois = []
             for poi in pois:
                 coords = poi.coordinates or (None, None)
                 db_pois.append(PointOfInterest(
-                    city=city,
+                    city=city,  # Always use the root city
                     name=poi.name,
                     category=poi.category,
                     description=poi.description,
@@ -49,18 +56,25 @@ def import_city_data(self, city_name: str, parent_task_id: str = None):
             # Bulk create POIs
             PointOfInterest.objects.bulk_create(db_pois)
             
-            # TODO: Find district pages and create child tasks
-            # district_pages = scraper.find_district_pages(city_name)
-            # for district in district_pages:
-            #     import_city_data.delay(district, self.request.id)
+            # Create tasks for district pages, passing along the root city
+            current_task_id = self.request.id
+            for district in district_pages:
+                logger.info(f"Enqueueing district task for {district} (part of {root_city_name})")
+                import_city_data.delay(
+                    city_name=district,
+                    root_city_name=root_city_name,
+                    parent_task_id=current_task_id
+                )
             
             return {
                 'status': 'success',
                 'city': city_name,
-                'pois_count': len(db_pois)
+                'root_city': root_city_name,
+                'pois_count': len(db_pois),
+                'districts_enqueued': len(district_pages)
             }
             
     except Exception as e:
-        # Log the error and re-raise it for Celery to handle
+        logger.error(f"Error processing {city_name}: {str(e)}")
         self.update_state(state='FAILURE', meta={'error': str(e)})
         raise 

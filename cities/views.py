@@ -8,9 +8,6 @@ from django.db import transaction
 from .tasks import import_city_data
 from celery.result import AsyncResult
 from django.contrib import messages
-import logging
-
-logger = logging.getLogger(__name__)
 
 def city_list(request):
     cities = City.objects.all()
@@ -91,12 +88,9 @@ def import_city(request):
     if request.method == "POST":
         city_name = request.POST.get('city_name')
         try:
-            logger.info(f"Attempting to start Celery task for {city_name}")
             task = import_city_data.delay(city_name)
-            logger.info(f"Task created with id: {task.id}")
             messages.success(request, f'Started import for {city_name}')
         except Exception as e:
-            logger.error(f"Error starting Celery task: {str(e)}", exc_info=True)
             messages.error(request, f'Error importing {city_name}: {str(e)}')
     
     return redirect('city_list')

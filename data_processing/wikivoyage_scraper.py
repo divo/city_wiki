@@ -34,8 +34,10 @@ class WikivoyageScraper:
     # from data_processing.wikivoyage_scraper import WikivoyageScraper
     # scraper = WikivoyageScraper()
     # pois = scraper.get_city_data("Paris")
-    def get_city_data(self, city_name: str) -> List[PointOfInterest]:
-        # Get the raw wikitext using the MediaWiki API
+    def get_city_data(self, city_name: str) -> tuple[List[PointOfInterest], List[str]]:
+        """
+        Returns a tuple of (points_of_interest, district_pages)
+        """
         response = self.session.get(
             action='parse',
             page=city_name,
@@ -50,13 +52,18 @@ class WikivoyageScraper:
         parsed = wtp.parse(wikitext)
         
         pois = []
-        for section in parsed.sections:
-            print(section.title)
-            category = self._determine_category(section.title)
-            if category:
-                pois.extend(self._parse_section(section, category))
+        district_pages = []
         
-        return pois
+        for section in parsed.sections:
+            if section.title == "Districts":
+                for wikilink in section.wikilinks:
+                    district_pages.append(wikilink.title)
+            else:
+                category = self._determine_category(section.title)
+                if category:
+                    pois.extend(self._parse_section(section, category))
+        
+        return pois, district_pages
     
     def _determine_category(self, title: str) -> Optional[str]:
         if not title:
@@ -128,18 +135,3 @@ class WikivoyageScraper:
             images=[args['image']] if 'image' in args else [],
             rank=rank
         )
-
-if __name__ == "__main__":
-    # Test the scraper
-    scraper = WikivoyageScraper()
-    pois = scraper.get_city_data("Paris")
-    
-    # Print first 3 POIs from each category
-    for category in scraper.CATEGORIES.keys():
-        print(f"\n=== {category.upper()} ===")
-        category_pois = [poi for poi in pois if poi.category == category]
-        for poi in category_pois[:3]:
-            print(f"\nName: {poi.name}")
-            print(f"Description: {poi.description[:100]}...")
-            if poi.coordinates:
-                print(f"Coordinates: {poi.coordinates}")
