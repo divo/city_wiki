@@ -1,7 +1,23 @@
 from django.db import models
 
+class City(models.Model):
+    name = models.CharField(max_length=200, unique=True)
+    country = models.CharField(max_length=200)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['name']
+        verbose_name_plural = 'cities'
+    
+    def __str__(self):
+        return f"{self.name}, {self.country}"
+
 class PointOfInterest(models.Model):
     # TODO: Need universal ID(s). Probably going to be a mix of (lat,long) and OSM IDs
+    city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='points_of_interest')
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=50, choices=[
         ('see', 'See'),
@@ -19,12 +35,11 @@ class PointOfInterest(models.Model):
     website = models.URLField(max_length=500, null=True, blank=True)
     hours = models.CharField(max_length=500, null=True, blank=True)
     rank = models.IntegerField(default=0)
-    city_name = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['category', 'rank']
         indexes = [
-            models.Index(fields=['city_name', 'category']),
+            models.Index(fields=['city', 'category']),
         ]

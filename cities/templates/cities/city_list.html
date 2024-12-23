@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>Cities</h1>
+    <div class="city-list">
+        {% for city in cities %}
+            <div class="city-item">
+                <h2>{{ city.name }}, {{ city.country }}</h2>
+                <p>Points of Interest: {{ city.points_of_interest.count }}</p>
+                <p>Last updated: {{ city.updated_at|date:"F j, Y" }}</p>
+            </div>
+        {% empty %}
+            <p>No cities imported yet.</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 

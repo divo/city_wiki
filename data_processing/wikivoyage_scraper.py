@@ -52,7 +52,6 @@ class WikivoyageScraper:
         pois = []
         for section in parsed.sections:
             print(section.title)
-            if section.title == "See": breakpoint()
             category = self._determine_category(section.title)
             if category:
                 pois.extend(self._parse_section(section, category))
