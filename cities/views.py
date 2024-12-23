@@ -71,3 +71,21 @@ def city_detail(request, city_name):
         'city': city,
         'pois_by_category': pois_by_category
     })
+
+@csrf_exempt  # TODO: Replace with proper admin authentication
+@require_http_methods(["DELETE"])
+def delete_city(request, city_name):
+    try:
+        city = get_object_or_404(City, name=city_name)
+        city.delete()  # This will cascade delete all POIs due to the ForeignKey relationship
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Deleted {city_name} and all its points of interest'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)

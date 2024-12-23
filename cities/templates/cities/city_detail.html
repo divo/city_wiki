@@ -5,7 +5,10 @@
     <div class="city-header">
         <h1>{{ city.name }}, {{ city.country }}</h1>
         <p>Last updated: {{ city.updated_at|date:"F j, Y" }}</p>
-        <a href="{% url 'city_list' %}" class="back-link">← Back to Cities</a>
+        <div class="actions">
+            <a href="{% url 'city_list' %}" class="back-link">← Back to Cities</a>
+            <button onclick="deleteCity('{{ city.name }}')" class="delete-btn">Delete City</button>
+        </div>
     </div>
 
     {% for category, pois in pois_by_category.items %}
@@ -57,4 +60,25 @@
         </section>
     {% endfor %}
 </div>
+
+<script>
+function deleteCity(cityName) {
+    if (confirm(`Are you sure you want to delete ${cityName} and all its points of interest?`)) {
+        fetch(`/city/${encodeURIComponent(cityName)}/delete/`, {
+            method: 'DELETE',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.href = '{% url "city_list" %}';
+            } else {
+                alert('Error deleting city: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error deleting city: ' + error);
+        });
+    }
+}
+</script>
 {% endblock %} 
