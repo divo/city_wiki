@@ -2,6 +2,22 @@
 
 {% block content %}
 <div class="container">
+    <div class="import-section">
+        <h2>Import City</h2>
+        <form method="post" action="{% url 'import_city' %}" class="import-form">
+            {% csrf_token %}
+            <input type="text" name="city_name" placeholder="Enter city name" required>
+            <button type="submit">Import</button>
+        </form>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="message {{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
     <h1>Cities</h1>
     <div class="city-list">
         {% for city in cities %}
