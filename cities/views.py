@@ -60,3 +60,14 @@ def import_city_data(request, city_name):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+def city_detail(request, city_name):
+    city = get_object_or_404(City, name=city_name)
+    pois_by_category = {}
+    for category, _ in PointOfInterest.CATEGORIES:
+        pois_by_category[category] = city.points_of_interest.filter(category=category).order_by('rank')
+    
+    return render(request, 'cities/city_detail.html', {
+        'city': city,
+        'pois_by_category': pois_by_category
+    })
