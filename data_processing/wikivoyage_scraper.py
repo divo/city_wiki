@@ -90,7 +90,17 @@ class WikivoyageScraper:
         
         if 'name' not in args:
             return None
-            
+        
+        # Handle markdown-style links in name field
+        # TODO: Might want to store the link so I can parse it later
+        name = args['name']
+        if '[[' in name and ']]' in name:
+            # Extract text between [[ and ]]
+            name = name.split('[[')[-1].split(']]')[0]
+            # If there's a pipe character, take the text after it
+            if '|' in name:
+                name = name.split('|')[1]
+        
         # Parse coordinates if present
         coords = None
         if 'lat' in args and 'long' in args:
@@ -107,7 +117,7 @@ class WikivoyageScraper:
             description = f"{description} {args['content']}" if description else args['content']
         
         return PointOfInterest(
-            name=args['name'],
+            name=name,  # Use the cleaned name
             category=category,
             description=description.strip(),
             coordinates=coords,
