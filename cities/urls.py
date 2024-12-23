@@ -1,5 +1,6 @@
 from django.urls import path
+from . import views
 
 urlpatterns = [
-    # We'll add URL patterns later
+    path('import-city/<str:city_name>/', views.import_city_data, name='import_city_data'),
 ]
