@@ -8,14 +8,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 @shared_task(bind=True)
-def import_city_data(self, city_name: str, root_city_name: str = None, parent_task_id: str = None):
+def import_city_data(self, city_name: str, root_city_name: str = None, parent_task_id: str = None, max_depth: int = 2, current_depth: int = 0):
     """
     Import POIs for a city or district.
     city_name: The page to scrape
     root_city_name: The main city these POIs belong to (same as city_name for root tasks)
     parent_task_id: ID of the parent task (None for root tasks)
+    max_depth: Maximum depth of recursion for district pages (default: 2)
+    current_depth: Current depth in the recursion (default: 0)
     """
-    logger.info(f"Starting import task for {city_name}")
+    logger.info(f"Starting import task for {city_name} (depth: {current_depth}/{max_depth})")
     try:
         scraper = WikivoyageScraper()
         pois, district_pages = scraper.get_city_data(city_name)
@@ -56,22 +58,29 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
             # Bulk create POIs
             PointOfInterest.objects.bulk_create(db_pois)
             
-            # Create tasks for district pages, passing along the root city
-            current_task_id = self.request.id
-            for district in district_pages:
-                logger.info(f"Enqueueing district task for {district} (part of {root_city_name})")
-                import_city_data.delay(
-                    city_name=district,
-                    root_city_name=root_city_name,
-                    parent_task_id=current_task_id
-                )
+            # Create tasks for district pages if we haven't reached max_depth
+            if current_depth < max_depth:
+                current_task_id = self.request.id
+                for district in district_pages:
+                    logger.info(f"Enqueueing district task for {district} (part of {root_city_name}, depth: {current_depth + 1})")
+                    import_city_data.delay(
+                        city_name=district,
+                        root_city_name=root_city_name,
+                        parent_task_id=current_task_id,
+                        max_depth=max_depth,
+                        current_depth=current_depth + 1
+                    )
+            else:
+                logger.info(f"Reached maximum depth ({max_depth}) for {city_name}, skipping district pages")
             
             return {
                 'status': 'success',
                 'city': city_name,
                 'root_city': root_city_name,
                 'pois_count': len(db_pois),
-                'districts_enqueued': len(district_pages)
+                'districts_enqueued': len(district_pages) if current_depth < max_depth else 0,
+                'depth': current_depth,
+                'max_depth': max_depth
             }
             
     except Exception as e:

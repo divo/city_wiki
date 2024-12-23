@@ -7,6 +7,7 @@
         <form method="post" action="{% url 'import_city' %}" class="import-form">
             {% csrf_token %}
             <input type="text" name="city_name" placeholder="Enter city name" required>
+            <input type="number" name="max_depth" placeholder="Max depth" value="2" min="0" max="5" required>
             <button type="submit">Import</button>
         </form>
         {% if messages %}

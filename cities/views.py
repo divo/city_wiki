@@ -88,8 +88,11 @@ def import_city(request):
     if request.method == "POST":
         city_name = request.POST.get('city_name')
         try:
-            task = import_city_data.delay(city_name)
-            messages.success(request, f'Started import for {city_name}')
+            max_depth = int(request.POST.get('max_depth', 2))  # Default to 2 if not provided
+            task = import_city_data.delay(city_name, max_depth=max_depth)
+            messages.success(request, f'Started import for {city_name} with max depth {max_depth}')
+        except ValueError:
+            messages.error(request, 'Invalid max depth value')
         except Exception as e:
             messages.error(request, f'Error importing {city_name}: {str(e)}')
     
