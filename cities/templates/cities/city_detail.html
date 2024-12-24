@@ -20,9 +20,15 @@
                         <thead>
                             <tr>
                                 <th>Name</th>
+                                <th>Category</th>
                                 <th>Description</th>
+                                <th>Coords</th>
                                 <th>Address</th>
                                 <th>Contact</th>
+                                <th>Hours</th>
+                                <th>Website</th>
+                                <th>Rank</th>
+                                <th>Created at</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -34,21 +40,33 @@
                                             <br><a href="{{ poi.website }}" target="_blank">Website</a>
                                         {% endif %}
                                     </td>
+                                    <td>{{ poi.category }}</td>
                                     <td>{{ poi.description|truncatewords:30 }}</td>
                                     <td>
-                                        {{ poi.address }}
                                         {% if poi.latitude and poi.longitude %}
                                             <br><small>{{ poi.latitude }}, {{ poi.longitude }}</small>
                                         {% endif %}
                                     </td>
                                     <td>
+                                        {{ poi.address }}
+                                    </td>
+                                    <td>
                                         {% if poi.phone %}
                                             {{ poi.phone }}<br>
                                         {% endif %}
+                                   </td>
+                                    <td>
                                         {% if poi.hours %}
                                             <small>{{ poi.hours }}</small>
                                         {% endif %}
                                     </td>
+                                    <td>
+                                        {% if poi.website %}
+                                            <br><a href="{{ poi.website }}" target="_blank">Website</a>
+                                        {% endif %}
+                                    </td>
+                                    <td> {{ poi.rank }}</td>
+                                    <td> {{ poi.created_at }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
