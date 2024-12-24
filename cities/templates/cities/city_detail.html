@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    .empty-cell {
+        background-color: #ffebee;  /* Light red background */
+    }
+</style>
+
 <div class="container">
     <div class="city-header">
         <h1>{{ city.name }}, {{ city.country }}</h1>
@@ -34,39 +40,35 @@
                         <tbody>
                             {% for poi in pois %}
                                 <tr>
-                                    <td>
-                                        <strong>{{ poi.name }}</strong>
+                                    <td {% if not poi.name %}class="empty-cell"{% endif %}>
+                                        <strong>{{ poi.name|default:"" }}</strong>
                                         {% if poi.website %}
                                             <br><a href="{{ poi.website }}" target="_blank">Website</a>
                                         {% endif %}
                                     </td>
-                                    <td>{{ poi.category }}</td>
-                                    <td>{{ poi.description|truncatewords:30 }}</td>
-                                    <td>
+                                    <td {% if not poi.category %}class="empty-cell"{% endif %}>{{ poi.category|default:"" }}</td>
+                                    <td {% if not poi.description %}class="empty-cell"{% endif %}>{{ poi.description|truncatewords:30|default:"" }}</td>
+                                    <td {% if not poi.latitude and not poi.longitude %}class="empty-cell"{% endif %}>
                                         {% if poi.latitude and poi.longitude %}
-                                            <br><small>{{ poi.latitude }}, {{ poi.longitude }}</small>
+                                            {{ poi.latitude }}, {{ poi.longitude }}
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        {{ poi.address }}
+                                    <td {% if not poi.address %}class="empty-cell"{% endif %}>
+                                        {{ poi.address|default:"" }}
                                     </td>
-                                    <td>
-                                        {% if poi.phone %}
-                                            {{ poi.phone }}<br>
-                                        {% endif %}
-                                   </td>
-                                    <td>
-                                        {% if poi.hours %}
-                                            <small>{{ poi.hours }}</small>
-                                        {% endif %}
+                                    <td {% if not poi.phone %}class="empty-cell"{% endif %}>
+                                        {{ poi.phone|default:"" }}
                                     </td>
-                                    <td>
+                                    <td {% if not poi.hours %}class="empty-cell"{% endif %}>
+                                        {{ poi.hours|default:"" }}
+                                    </td>
+                                    <td {% if not poi.website %}class="empty-cell"{% endif %}>
                                         {% if poi.website %}
-                                            <br><a href="{{ poi.website }}" target="_blank">Website</a>
+                                            <a href="{{ poi.website }}" target="_blank">Website</a>
                                         {% endif %}
                                     </td>
-                                    <td> {{ poi.rank }}</td>
-                                    <td> {{ poi.created_at }}</td>
+                                    <td {% if not poi.rank %}class="empty-cell"{% endif %}>{{ poi.rank|default:"" }}</td>
+                                    <td {% if not poi.created_at %}class="empty-cell"{% endif %}>{{ poi.created_at|default:"" }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
