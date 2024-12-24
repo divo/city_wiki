@@ -15,6 +15,20 @@ class City(models.Model):
     def __str__(self):
         return f"{self.name}, {self.country}"
 
+class District(models.Model):
+    name = models.CharField(max_length=200)
+    city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='districts')
+    parent_district = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subdistricts')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        unique_together = [['name', 'city']]  # A district name should be unique within a city
+
+    def __str__(self):
+        return f"{self.name} (District of {self.city.name})"
+
 class PointOfInterest(models.Model):
     CATEGORIES = [
         ('see', 'See'),
@@ -26,7 +40,8 @@ class PointOfInterest(models.Model):
     ]
     
     # TODO: Need universal ID(s). Probably going to be a mix of (lat,long) and OSM IDs
-    city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='points_of_interest', null=True)
+    city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='points_of_interest')
+    district = models.ForeignKey(District, on_delete=models.SET_NULL, null=True, blank=True, related_name='points_of_interest')
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=50, choices=CATEGORIES)
     description = models.TextField()
@@ -44,4 +59,5 @@ class PointOfInterest(models.Model):
         ordering = ['category', 'rank']
         indexes = [
             models.Index(fields=['city', 'category']),
+            models.Index(fields=['district', 'category']),
         ]

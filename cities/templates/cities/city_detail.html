@@ -20,63 +20,7 @@
     {% for category, pois in pois_by_category.items %}
         <section class="category-section">
             <h2>{{ category|title }}</h2>
-            {% if pois %}
-                <div class="table-responsive">
-                    <table class="poi-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Category</th>
-                                <th>Description</th>
-                                <th>Coords</th>
-                                <th>Address</th>
-                                <th>Contact</th>
-                                <th>Hours</th>
-                                <th>Website</th>
-                                <th>Rank</th>
-                                <th>Created at</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for poi in pois %}
-                                <tr>
-                                    <td {% if not poi.name %}class="empty-cell"{% endif %}>
-                                        <strong>{{ poi.name|default:"" }}</strong>
-                                        {% if poi.website %}
-                                            <br><a href="{{ poi.website }}" target="_blank">Website</a>
-                                        {% endif %}
-                                    </td>
-                                    <td {% if not poi.category %}class="empty-cell"{% endif %}>{{ poi.category|default:"" }}</td>
-                                    <td {% if not poi.description %}class="empty-cell"{% endif %}>{{ poi.description|truncatewords:30|default:"" }}</td>
-                                    <td {% if not poi.latitude and not poi.longitude %}class="empty-cell"{% endif %}>
-                                        {% if poi.latitude and poi.longitude %}
-                                            {{ poi.latitude }}, {{ poi.longitude }}
-                                        {% endif %}
-                                    </td>
-                                    <td {% if not poi.address %}class="empty-cell"{% endif %}>
-                                        {{ poi.address|default:"" }}
-                                    </td>
-                                    <td {% if not poi.phone %}class="empty-cell"{% endif %}>
-                                        {{ poi.phone|default:"" }}
-                                    </td>
-                                    <td {% if not poi.hours %}class="empty-cell"{% endif %}>
-                                        {{ poi.hours|default:"" }}
-                                    </td>
-                                    <td {% if not poi.website %}class="empty-cell"{% endif %}>
-                                        {% if poi.website %}
-                                            <a href="{{ poi.website }}" target="_blank">Website</a>
-                                        {% endif %}
-                                    </td>
-                                    <td {% if not poi.rank %}class="empty-cell"{% endif %}>{{ poi.rank|default:"" }}</td>
-                                    <td {% if not poi.created_at %}class="empty-cell"{% endif %}>{{ poi.created_at|default:"" }}</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% else %}
-                <p>No points of interest in this category.</p>
-            {% endif %}
+            {% include "cities/poi_table.html" with pois=pois %}
         </section>
     {% endfor %}
 </div>

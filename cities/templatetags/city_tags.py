@@ -1,0 +1,19 @@
+from django import template
+import pprint
+
+register = template.Library()
+
+@register.filter
+def get_item(dictionary, key):
+    """Get an item from a dictionary using bracket notation in templates"""
+    return dictionary.get(key, {}) 
+
+@register.filter
+def items(dictionary):
+    """Convert dictionary to items for iteration"""
+    return dictionary.items() 
+
+@register.filter
+def pprint(value):
+    """Pretty print a value for debugging"""
+    return pprint.pformat(value, indent=2) 

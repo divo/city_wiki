@@ -8,6 +8,9 @@ from django.db import transaction
 from .tasks import import_city_data
 from celery.result import AsyncResult
 from django.contrib import messages
+import logging
+
+logger = logging.getLogger(__name__)
 
 def city_list(request):
     cities = City.objects.all()
@@ -57,13 +60,17 @@ def check_import_status(request, task_id):
 
 def city_detail(request, city_name):
     city = get_object_or_404(City, name=city_name)
+    
+    # Get all POIs for this city, organized by category
     pois_by_category = {}
     for category, _ in PointOfInterest.CATEGORIES:
-        pois_by_category[category] = city.points_of_interest.filter(category=category).order_by('rank')
+        pois_by_category[category] = city.points_of_interest.filter(
+            category=category
+        ).select_related('district').order_by('district__name', 'rank')
     
     return render(request, 'cities/city_detail.html', {
         'city': city,
-        'pois_by_category': pois_by_category
+        'pois_by_category': pois_by_category,
     })
 
 @csrf_exempt  # TODO: Replace with proper admin authentication
