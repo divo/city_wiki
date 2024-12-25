@@ -4,12 +4,12 @@ from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from data_processing.wikivoyage_scraper import WikivoyageScraper
 from .models import PointOfInterest, City
-from django.db import transaction
+from django.db import transaction, models
 from .tasks import import_city_data
 from celery.result import AsyncResult
 from django.contrib import messages
 import logging
-
+from django.db.models import Count
 logger = logging.getLogger(__name__)
 
 def city_list(request):
@@ -63,14 +63,20 @@ def city_detail(request, city_name):
     
     # Get all POIs for this city, organized by category
     pois_by_category = {}
+    category_rank_counts = {}
     for category, _ in PointOfInterest.CATEGORIES:
-        pois_by_category[category] = city.points_of_interest.filter(
+        pois = city.points_of_interest.filter(
             category=category
-        ).select_related('district').order_by('district__name', 'rank')
+        ).select_related('district').order_by('rank')
+        pois_by_category[category] = pois
+        # Count POIs by rank
+        rank_counts = list(pois.values('rank').annotate(count=Count('rank')).order_by('rank'))
+        category_rank_counts[category] = rank_counts
     
     return render(request, 'cities/city_detail.html', {
         'city': city,
         'pois_by_category': pois_by_category,
+        'category_rank_counts': category_rank_counts,
     })
 
 @csrf_exempt  # TODO: Replace with proper admin authentication

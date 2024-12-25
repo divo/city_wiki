@@ -1,9 +1,22 @@
 {% extends "base.html" %}
+{% load city_tags %}
 
 {% block content %}
 <style>
     .empty-cell {
         background-color: #ffebee;  /* Light red background */
+    }
+    .rank-counts {
+        list-style: none;
+        padding: 0;
+        margin-bottom: 1em;
+    }
+    .rank-counts li {
+        display: inline-block;
+        margin-right: 1em;
+        padding: 0.2em 0.5em;
+        background-color: #f5f5f5;
+        border-radius: 3px;
     }
 </style>
 
@@ -19,7 +32,12 @@
 
     {% for category, pois in pois_by_category.items %}
         <section class="category-section">
-            <h2>{{ category|title }}</h2>
+            <h2>{{ category|title }} ({{ pois|length }})</h2>
+            <ul class="rank-counts">
+                {% for rank_info in category_rank_counts|get_item:category %}
+                    <li>Rank {{ rank_info.rank }}: {{ rank_info.count }} POIs</li>
+                {% endfor %}
+            </ul>
             {% include "cities/poi_table.html" with pois=pois %}
         </section>
     {% endfor %}
@@ -45,4 +63,4 @@ function deleteCity(cityName) {
     }
 }
 </script>
-{% endblock %} 
+{% endblock %}
