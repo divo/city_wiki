@@ -40,28 +40,24 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
     """
     logger.info(f"Starting import task for {city_name} (depth: {current_depth}/{max_depth})")
     try:
-        # For root task, use city_name as root_city_name
-        if not root_city_name:
-            root_city_name = city_name
-
-        # Create/update the root city
-        city, created = City.objects.get_or_create(
-            name=root_city_name,
-            defaults={'country': 'Unknown'}
-        )
-
-        # Fetch POIs and district pages
-        pois, district_pages = _fetch_pois(city, current_depth)
-        
-        if pois is None:
-            self.update_state(state='FAILURE', meta={'error': str(e)})
-            return
-
+        scraper = WikivoyageScraper()
+        pois, district_pages = scraper.get_city_data(city_name)
+ 
         # Parse district name if it contains a slash
         if district_name and '/' in district_name:
             district_name = district_name.split('/', 1)[1]
 
         with transaction.atomic():
+            # For root task, use city_name as root_city_name
+            if not root_city_name:
+                root_city_name = city_name
+            
+            # Create/update the root city
+            city, created = City.objects.get_or_create(
+                name=root_city_name,
+                defaults={'country': 'Unknown'}
+            )
+            
             # Create/update district if this is a district page
             current_district = None
             if district_name:
