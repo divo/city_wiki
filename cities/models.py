@@ -61,3 +61,23 @@ class PointOfInterest(models.Model):
             models.Index(fields=['city', 'category']),
             models.Index(fields=['district', 'category']),
         ]
+
+class Validation(models.Model):
+    """
+    Track specific errors that occur when building entries in the dataset.
+    """
+    parent_key = models.CharField(max_length=50, help_text="Key of the record being referenced")
+    context = models.CharField(max_length=50, help_text="Context of the validation (e.g., 'import', 'update')")
+    aggregate = models.CharField(max_length=50, help_text="High-level error category")
+    specialized_aggregate = models.CharField(max_length=50, help_text="Specific error subcategory")
+    description = models.CharField(max_length=500, help_text="Detailed description of the validation error")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['parent_key']),
+            models.Index(fields=['context', 'aggregate']),
+        ]
+
+    def __str__(self):
+        return f"{self.aggregate}: {self.reference_key} ({self.context})"

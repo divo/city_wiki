@@ -1,16 +1,33 @@
 from celery import shared_task
 from data_processing.wikivoyage_scraper import WikivoyageScraper
-from .models import City, PointOfInterest, District
+from .models import City, PointOfInterest, District, Validation
+from mwapi.errors import APIError
 from django.db import transaction
 from celery import chain
 import logging
 
 logger = logging.getLogger(__name__)
 
-# TODO: This method is way too long
+def _fetch_pois(city, depth):
+    """Helper function to fetch POIs and handle API errors"""
+    try:
+        scraper = WikivoyageScraper()
+        return scraper.get_city_data(city.name)
+    except APIError as response_error:
+        logger.error(f"Non fatal API error for {city.name}: {response_error}")
+        Validation.objects.create(
+            parent_key=city,
+            context='WikiImport',
+            aggregate='FetchArticleError',
+            specialized_aggregate='DistrictFetchError' if depth != 0 else 'CityFetchError',
+            description=str(response_error)
+        )
+        return None, None
+
+
 @shared_task(bind=True)
-def import_city_data(self, city_name: str, root_city_name: str = None, parent_task_id: str = None, 
-                    max_depth: int = 2, current_depth: int = 0, district_name: str = None, parent_district_id: int = None):
+def import_city_data(self, city_name: str, root_city_name: str = None, parent_task_id: str = None,
+                     max_depth: int = 2, current_depth: int = 0, district_name: str = None, parent_district_id: int = None):
     """
     Import POIs for a city or district.
     city_name: The page to scrape
@@ -23,24 +40,29 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
     """
     logger.info(f"Starting import task for {city_name} (depth: {current_depth}/{max_depth})")
     try:
-        scraper = WikivoyageScraper()
-        pois, district_pages = scraper.get_city_data(city_name)
+        # For root task, use city_name as root_city_name
+        if not root_city_name:
+            root_city_name = city_name
+
+        # Create/update the root city
+        city, created = City.objects.get_or_create(
+            name=root_city_name,
+            defaults={'country': 'Unknown'}
+        )
+
+        # Fetch POIs and district pages
+        if city.name == 'Neuilly-sur-Seine': breakpoint()
+        pois, district_pages = _fetch_pois(city, current_depth)
         
+        if pois is None:
+            self.update_state(state='FAILURE', meta={'error': str(e)})
+            return
+
         # Parse district name if it contains a slash
         if district_name and '/' in district_name:
             district_name = district_name.split('/', 1)[1]
-        
+
         with transaction.atomic():
-            # For root task, use city_name as root_city_name
-            if not root_city_name:
-                root_city_name = city_name
-            
-            # Create/update the root city
-            city, created = City.objects.get_or_create(
-                name=root_city_name,
-                defaults={'country': 'Unknown'}
-            )
-            
             # Create/update district if this is a district page
             current_district = None
             if district_name:
@@ -50,11 +72,11 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
                     city=city,
                     defaults={'parent_district': parent_district}
                 )
-            
+
             # Only clear existing POIs if this is a root task
             if not parent_task_id:
                 city.points_of_interest.all().delete()
-            
+
             # Create new POIs, associated with both city and district
             db_pois = []
             for poi in pois:
@@ -73,10 +95,10 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
                     hours=poi.hours,
                     rank=poi.rank
                 ))
-            
+
             # Bulk create POIs
             PointOfInterest.objects.bulk_create(db_pois)
-            
+
             # Create tasks for district pages if we haven't reached max_depth
             if current_depth < max_depth:
                 current_task_id = self.request.id
@@ -93,7 +115,7 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
                     )
             else:
                 logger.info(f"Reached maximum depth ({max_depth}) for {city_name}, skipping district pages")
-            
+
             return {
                 'status': 'success',
                 'city': city_name,
@@ -104,8 +126,8 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
                 'depth': current_depth,
                 'max_depth': max_depth
             }
-            
+
     except Exception as e:
         logger.error(f"Error processing {city_name}: {str(e)}")
         self.update_state(state='FAILURE', meta={'error': str(e)})
-        raise 
+        raise
