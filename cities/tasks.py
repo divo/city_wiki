@@ -51,7 +51,6 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
         )
 
         # Fetch POIs and district pages
-        if city.name == 'Neuilly-sur-Seine': breakpoint()
         pois, district_pages = _fetch_pois(city, current_depth)
         
         if pois is None:
