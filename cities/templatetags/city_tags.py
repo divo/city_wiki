@@ -17,3 +17,8 @@ def items(dictionary):
 def pprint(value):
     """Pretty print a value for debugging"""
     return pprint.pformat(value, indent=2) 
+
+@register.filter
+def split(value, arg):
+    """Split a string and return the list"""
+    return value.split(arg) 
