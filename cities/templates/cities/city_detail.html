@@ -18,6 +18,30 @@
         background-color: #f5f5f5;
         border-radius: 3px;
     }
+    
+    .filters {
+        margin-top: 20px;
+    }
+    
+    .rank-filter {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+    
+    .rank-filter select {
+        padding: 5px 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: white;
+    }
+    
+    .rank-filter label {
+        font-weight: bold;
+    }
 </style>
 
 <div class="container">
@@ -27,6 +51,20 @@
         <div class="actions">
             <a href="{% url 'city_list' %}" class="back-link">← Back to Cities</a>
             <button onclick="deleteCity('{{ city.name }}')" class="delete-btn">Delete City</button>
+        </div>
+        
+        <div class="filters">
+            <form method="get" class="rank-filter">
+                <label for="max_rank">Max Rank:</label>
+                <select name="max_rank" id="max_rank" onchange="this.form.submit()">
+                    <option value="0" {% if max_rank == 0 %}selected{% endif %}>All Ranks</option>
+                    {% for i in "12345"|make_list %}
+                        <option value="{{ i }}" {% if max_rank == i|add:"0" %}selected{% endif %}>
+                            Rank {{ i }} or better
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
         </div>
     </div>
 

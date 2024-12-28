@@ -4,6 +4,7 @@
             <thead>
                 <tr>
                     <th>Name</th>
+                    <th>Rank</th>
                     <th>District</th>
                     <th>Description</th>
                     <th>Coords</th>
@@ -11,7 +12,6 @@
                     <th>Contact</th>
                     <th>Hours</th>
                     <th>Website</th>
-                    <th>Rank</th>
                     <th>Created at</th>
                 </tr>
             </thead>
@@ -24,6 +24,7 @@
                                 <br><a href="{{ poi.website }}" target="_blank">Website</a>
                             {% endif %}
                         </td>
+                        <td {% if not poi.rank %}class="empty-cell"{% endif %}>{{ poi.rank|default:"" }}</td>
                         <td {% if not poi.district %}class="empty-cell"{% endif %}>
                             {{ poi.district.name|default:"Main City" }}
                             {% if poi.district.parent_district %}
@@ -50,7 +51,6 @@
                                 <a href="{{ poi.website }}" target="_blank">Website</a>
                             {% endif %}
                         </td>
-                        <td {% if not poi.rank %}class="empty-cell"{% endif %}>{{ poi.rank|default:"" }}</td>
                         <td {% if not poi.created_at %}class="empty-cell"{% endif %}>{{ poi.created_at|default:"" }}</td>
                     </tr>
                 {% endfor %}

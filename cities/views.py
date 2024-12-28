@@ -61,22 +61,38 @@ def check_import_status(request, task_id):
 def city_detail(request, city_name):
     city = get_object_or_404(City, name=city_name)
     
+    # Get max_rank filter from query params
+    try:
+        max_rank = int(request.GET.get('max_rank', 0))
+    except ValueError:
+        max_rank = 0
+    
     # Get all POIs for this city, organized by category
     pois_by_category = {}
     category_rank_counts = {}
     for category, _ in PointOfInterest.CATEGORIES:
+        # Base query with sorting
         pois = city.points_of_interest.filter(
             category=category
-        ).select_related('district').order_by('rank')
+        ).select_related('district').order_by('name', 'rank')
+        
+        # Apply rank filter if specified
+        if max_rank > 0:
+            pois = pois.filter(rank__lte=max_rank)
+        
         pois_by_category[category] = pois
-        # Count POIs by rank
-        rank_counts = list(pois.values('rank').annotate(count=Count('rank')).order_by('rank'))
+        
+        # Count POIs by rank (show all ranks even when filtered)
+        rank_counts = list(city.points_of_interest.filter(
+            category=category
+        ).values('rank').annotate(count=Count('rank')).order_by('rank'))
         category_rank_counts[category] = rank_counts
     
     return render(request, 'cities/city_detail.html', {
         'city': city,
         'pois_by_category': pois_by_category,
         'category_rank_counts': category_rank_counts,
+        'max_rank': max_rank,
     })
 
 @csrf_exempt  # TODO: Replace with proper admin authentication
