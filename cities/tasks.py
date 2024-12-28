@@ -8,15 +8,21 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def _fetch_pois(city, depth):
+def _fetch_pois(city_name, depth):
     """Helper function to fetch POIs and handle API errors"""
     try:
         scraper = WikivoyageScraper()
-        return scraper.get_city_data(city.name)
+        return scraper.get_city_data(city_name)
     except APIError as response_error:
-        logger.error(f"Non fatal API error for {city.name}: {response_error}")
+        logger.error(f"Non fatal API error for {city_name}: {response_error}")
+        try:
+            city = City.objects.get(name=city_name)
+        except City.DoesNotExist:
+            city = None
+            logger.warning(f"Creating validation without city: {city_name} does not exist yet")
+        
         Validation.objects.create(
-            parent_key=city,
+            parent=city,  # Can be None now
             context='WikiImport',
             aggregate='FetchArticleError',
             specialized_aggregate='DistrictFetchError' if depth != 0 else 'CityFetchError',
@@ -40,8 +46,15 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
     """
     logger.info(f"Starting import task for {city_name} (depth: {current_depth}/{max_depth})")
     try:
-        scraper = WikivoyageScraper()
-        pois, district_pages = scraper.get_city_data(city_name)
+        pois, district_pages = _fetch_pois(city_name, current_depth)
+
+        if pois == None:
+            logger.error(f"Error fetching POIs for {city_name}")
+            return {
+                'status': 'error',
+                'city': city_name,
+                'error': 'Error fetching POIs'
+            }
  
         # Parse district name if it contains a slash
         if district_name and '/' in district_name:

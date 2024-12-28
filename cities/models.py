@@ -66,7 +66,7 @@ class Validation(models.Model):
     """
     Track specific errors that occur when building entries in the dataset.
     """
-    parent_key = models.CharField(max_length=50, help_text="Key of the record being referenced")
+    parent = models.ForeignKey(City, on_delete=models.SET_NULL, null=True, blank=True, related_name='validations')
     context = models.CharField(max_length=50, help_text="Context of the validation (e.g., 'import', 'update')")
     aggregate = models.CharField(max_length=50, help_text="High-level error category")
     specialized_aggregate = models.CharField(max_length=50, help_text="Specific error subcategory")
@@ -75,9 +75,9 @@ class Validation(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['parent_key']),
+            models.Index(fields=['parent']),
             models.Index(fields=['context', 'aggregate']),
         ]
 
     def __str__(self):
-        return f"{self.aggregate}: {self.reference_key} ({self.context})"
+        return f"{self.aggregate}: {self.parent.name if self.parent else 'No City'} ({self.context})"
