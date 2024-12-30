@@ -5,6 +5,8 @@ from typing import List, Optional
 import logging
 import mwapi  # MediaWiki API wrapper
 
+logger = logging.getLogger(__name__)
+
 @dataclass
 class PointOfInterest:
     name: str
@@ -76,18 +78,57 @@ class WikivoyageScraper:
         return None
     
     def _parse_section(self, section: wtp.Section, category: str) -> List[PointOfInterest]:
+        """Parse POIs from a section and its subsections, maintaining proper rank ordering.
+        
+        The function processes templates in bottom-up order:
+        1. Process deepest subsections first
+        2. Then process parent sections
+        
+        Note: In WikiTextParser, we've reached a leaf when section.sections returns
+        the same content as its parent section.
+        """
         pois = []
+        seen_pois = set()  # Track POIs by (name, coords) to avoid duplicates
         rank = 0
         
-        # Parse listing templates
+        # Process subsections that are different from current section
+        for subsection in section.sections:
+            if subsection.string != section.string: # If it's not a leaf section
+                logger.info(f"Processing subsection: {subsection.title} in {section.title}")
+                subsection_pois = self._parse_section(subsection, category)
+                for poi in subsection_pois:
+                    poi_key = (poi.name, poi.coordinates if poi.coordinates else None)
+                    if poi_key not in seen_pois:
+                        seen_pois.add(poi_key)
+                        rank += 1
+                        poi.rank = rank
+                        pois.append(poi)
+        
+        # Process templates in current section
         for template in section.templates:
             if template.name.lower().strip() in ['listing', 'see', 'do', 'buy', 'eat', 'drink', 'sleep']:
-                rank += 1
-                poi = self._parse_listing_template(template, category, rank)
+                poi = self._parse_listing_template(template, category, rank + 1)
                 if poi:
-                    pois.append(poi)
+                    poi_key = (poi.name, poi.coordinates if poi.coordinates else None)
+                    if poi_key not in seen_pois:
+                        seen_pois.add(poi_key)
+                        rank += 1
+                        poi.rank = rank
+                        logger.info(f"Found POI in {section.title}: {poi.name}")
+                        pois.append(poi)
         
         return pois
+    
+    def _get_section_templates(self, section: wtp.Section) -> List[wtp.Template]:
+        """Get templates that belong directly to this section, excluding those from subsections."""
+        subsection_templates = set()
+        for subsection in section.sections:
+            subsection_templates.update(template.string for template in subsection.templates)
+        
+        # Return only templates that aren't in subsections
+        return [template for template in section.templates 
+                if template.string not in subsection_templates
+                and template.name.lower().strip() in ['listing', 'see', 'do', 'buy', 'eat', 'drink', 'sleep']]
     
     def _parse_listing_template(self, template: wtp.Template, category: str, rank: int) -> Optional[PointOfInterest]:
         # Extract arguments from template
@@ -107,6 +148,8 @@ class WikivoyageScraper:
             # If there's a pipe character, take the text after it
             if '|' in name:
                 name = name.split('|')[1]
+
+        if name == "Coit Tower": breakpoint()
         
         # Parse coordinates if present
         coords = None
