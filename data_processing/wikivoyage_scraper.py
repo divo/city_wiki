@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 class PointOfInterest:
     name: str
     category: str
+    sub_category: Optional[str]
     description: str
     coordinates: Optional[tuple[float, float]] = None
     address: Optional[str] = None
@@ -93,7 +94,7 @@ class WikivoyageScraper:
         
         # Process subsections that are different from current section
         for subsection in section.sections:
-            if subsection.string != section.string: # If it's not a leaf section
+            if subsection.string != section.string:
                 logger.info(f"Processing subsection: {subsection.title} in {section.title}")
                 subsection_pois = self._parse_section(subsection, category)
                 for poi in subsection_pois:
@@ -107,7 +108,7 @@ class WikivoyageScraper:
         # Process templates in current section
         for template in section.templates:
             if template.name.lower().strip() in ['listing', 'see', 'do', 'buy', 'eat', 'drink', 'sleep']:
-                poi = self._parse_listing_template(template, category, rank + 1)
+                poi = self._parse_listing_template(template, category, rank + 1, section.title)
                 if poi:
                     poi_key = (poi.name, poi.coordinates if poi.coordinates else None)
                     if poi_key not in seen_pois:
@@ -130,7 +131,7 @@ class WikivoyageScraper:
                 if template.string not in subsection_templates
                 and template.name.lower().strip() in ['listing', 'see', 'do', 'buy', 'eat', 'drink', 'sleep']]
     
-    def _parse_listing_template(self, template: wtp.Template, category: str, rank: int) -> Optional[PointOfInterest]:
+    def _parse_listing_template(self, template: wtp.Template, category: str, rank: int, section_title: str) -> Optional[PointOfInterest]:
         # Extract arguments from template
         args = {arg.name.strip().lower(): arg.value.strip() 
                for arg in template.arguments 
@@ -149,8 +150,6 @@ class WikivoyageScraper:
             if '|' in name:
                 name = name.split('|')[1]
 
-        if name == "Coit Tower": breakpoint()
-        
         # Parse coordinates if present
         coords = None
         if 'lat' in args and 'long' in args:
@@ -169,6 +168,7 @@ class WikivoyageScraper:
         return PointOfInterest(
             name=name,  # Use the cleaned name
             category=category,
+            sub_category=section_title,
             description=description.strip(),
             coordinates=coords,
             address=args.get('address'),

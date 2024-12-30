@@ -94,6 +94,7 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
                     district=current_district,  # Will be None for root city POIs
                     name=poi.name,
                     category=poi.category,
+                    sub_category=poi.sub_category,
                     description=poi.description,
                     latitude=coords[0],
                     longitude=coords[1],

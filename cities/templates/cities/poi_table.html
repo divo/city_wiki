@@ -5,6 +5,7 @@
                 <tr>
                     <th>Name</th>
                     <th>Rank</th>
+                    <th>Sub-category</th>
                     <th>District</th>
                     <th>Description</th>
                     <th>Coords</th>
@@ -25,6 +26,7 @@
                             {% endif %}
                         </td>
                         <td {% if not poi.rank %}class="empty-cell"{% endif %}>{{ poi.rank|default:"" }}</td>
+                        <td {% if not poi.sub_category %}class="empty-cell"{% endif %}>{{ poi.sub_category|default:"" }}</td>
                         <td {% if not poi.district %}class="empty-cell"{% endif %}>
                             {{ poi.district.name|default:"Main City" }}
                             {% if poi.district.parent_district %}

@@ -44,6 +44,7 @@ class PointOfInterest(models.Model):
     district = models.ForeignKey(District, on_delete=models.SET_NULL, null=True, blank=True, related_name='points_of_interest')
     name = models.CharField(max_length=200)
     category = models.CharField(max_length=50, choices=CATEGORIES)
+    sub_category = models.CharField(max_length=200, null=True, blank=True)
     description = models.TextField()
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
