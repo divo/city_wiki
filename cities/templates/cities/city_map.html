@@ -45,6 +45,18 @@
     .map-header h2 {
         margin: 0;
     }
+    /* Marker styles */
+    .marker {
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: contain;
+        cursor: pointer;
+        transition: transform 0.2s;
+        display: block;
+    }
+    .marker:hover {
+        transform: scale(1.2);
+    }
     /* Popup styles */
     .mapboxgl-popup {
         max-width: 300px;
@@ -94,7 +106,7 @@
             const map = new mapboxgl.Map({
                 container: 'map',
                 style: 'mapbox://styles/mapbox/streets-v12',
-                center: [{{ city.longitude|default:2.3522 }}, {{ city.latitude|default:48.8566 }}],
+                center: [{{ center.longitude }}, {{ center.latitude }}],
                 zoom: 12
             });
 
@@ -119,27 +131,23 @@
                             </div>
                         `);
 
-                        new mapboxgl.Marker({
-                            color: getCategoryColor(poi.category)
-                        })
-                        .setLngLat([poi.longitude, poi.latitude])
-                        .setPopup(popup)
-                        .addTo(map);
+                        // Create custom marker element
+                        const el = document.createElement('div');
+                        el.className = 'marker';
+                        const imageUrl = "{% static 'cities/images/' %}" + poi.category + ".png";
+                        console.log('Loading marker image:', imageUrl);  // Debug log
+                        el.style.backgroundImage = `url("${imageUrl}")`;
+                        el.style.width = '30px';
+                        el.style.height = '30px';
+
+                        // Add marker to map
+                        new mapboxgl.Marker(el)
+                            .setLngLat([poi.longitude, poi.latitude])
+                            .setPopup(popup)
+                            .addTo(map);
                     }
                 });
             });
-
-            function getCategoryColor(category) {
-                const colors = {
-                    'see': '#FF4136',    // Red
-                    'eat': '#2ECC40',    // Green
-                    'sleep': '#0074D9',  // Blue
-                    'shop': '#FF851B',   // Orange
-                    'drink': '#B10DC9',  // Purple
-                    'play': '#FFDC00'    // Yellow
-                };
-                return colors[category] || '#AAAAAA';
-            }
         } catch (error) {
             console.error('Error initializing map:', error);
             document.getElementById('map').innerHTML = 'Error loading map. Please try again later.';

@@ -132,6 +132,13 @@ def city_map(request, city_name):
     city = get_object_or_404(City, name=city_name)
     pois = city.points_of_interest.all()
     
+    # Find first POI with coordinates to center the map
+    center_poi = pois.exclude(latitude=None, longitude=None).first()
+    center = {
+        'longitude': center_poi.longitude if center_poi else 2.3522,  # Paris default
+        'latitude': center_poi.latitude if center_poi else 48.8566
+    }
+    
     # Convert POIs to JSON for the template
     pois_json = json.dumps([{
         'name': poi.name,
@@ -146,5 +153,6 @@ def city_map(request, city_name):
     
     return render(request, 'cities/city_map.html', {
         'city': city,
-        'pois_json': pois_json
+        'pois_json': pois_json,
+        'center': center
     })
