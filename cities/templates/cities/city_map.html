@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block extra_head %}
+<!-- Mapbox CSS must come first -->
+<link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        overflow: hidden;
+    }
+    .map-container {
+        position: absolute;
+        top: 80px;  /* Space for header */
+        left: 20px;
+        right: 20px;
+        bottom: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    #map {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 8px;
+    }
+    .map-header {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        right: 20px;
+        z-index: 1;
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .map-header h2 {
+        margin: 0;
+    }
+    /* Popup styles */
+    .mapboxgl-popup {
+        max-width: 300px;
+    }
+    .poi-popup {
+        padding: 10px;
+    }
+    .poi-popup h3 {
+        margin: 0 0 10px 0;
+        color: #333;
+    }
+    .poi-popup p {
+        margin: 5px 0;
+        color: #666;
+    }
+    .poi-popup .category {
+        display: inline-block;
+        padding: 2px 8px;
+        background: #e9ecef;
+        border-radius: 12px;
+        font-size: 0.9em;
+        margin-bottom: 8px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="map-header">
+    <h2>{{ city.name }} - Points of Interest Map</h2>
+</div>
+<div class="map-container">
+    <div id="map"></div>
+</div>
+
+<!-- Load Mapbox GL JS -->
+<script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+
+<!-- Initialize the map -->
+<script>
+    if (!mapboxgl.supported()) {
+        alert('Your browser does not support Mapbox GL');
+    } else {
+        mapboxgl.accessToken = 'pk.eyJ1IjoiZGl2b2RpdmVuc29uIiwiYSI6ImNtNWI5emtqbDFmejkybHI3ZHJicGZjeTIifQ.r-F49IgRf5oLrtQEzMppmA';
+        
+        try {
+            // Initialize map
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [{{ city.longitude|default:2.3522 }}, {{ city.latitude|default:48.8566 }}],
+                zoom: 12
+            });
+
+            // Wait for map to load before adding markers
+            map.on('load', () => {
+                // Add navigation controls
+                map.addControl(new mapboxgl.NavigationControl());
+
+                // Add POI markers
+                const pois = {{ pois_json|safe }};
+                
+                pois.forEach(poi => {
+                    if (poi.latitude && poi.longitude) {
+                        const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                            <div class="poi-popup">
+                                <h3>${poi.name}</h3>
+                                <span class="category">${poi.category}</span>
+                                ${poi.sub_category ? `<span class="category">${poi.sub_category}</span>` : ''}
+                                ${poi.description ? `<p>${poi.description}</p>` : ''}
+                                ${poi.address ? `<p><strong>Address:</strong> ${poi.address}</p>` : ''}
+                                ${poi.website ? `<p><a href="${poi.website}" target="_blank">Website</a></p>` : ''}
+                            </div>
+                        `);
+
+                        new mapboxgl.Marker({
+                            color: getCategoryColor(poi.category)
+                        })
+                        .setLngLat([poi.longitude, poi.latitude])
+                        .setPopup(popup)
+                        .addTo(map);
+                    }
+                });
+            });
+
+            function getCategoryColor(category) {
+                const colors = {
+                    'see': '#FF4136',    // Red
+                    'eat': '#2ECC40',    // Green
+                    'sleep': '#0074D9',  // Blue
+                    'shop': '#FF851B',   // Orange
+                    'drink': '#B10DC9',  // Purple
+                    'play': '#FFDC00'    // Yellow
+                };
+                return colors[category] || '#AAAAAA';
+            }
+        } catch (error) {
+            console.error('Error initializing map:', error);
+            document.getElementById('map').innerHTML = 'Error loading map. Please try again later.';
+        }
+    }
+</script>
+{% endblock %} 

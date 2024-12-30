@@ -3,6 +3,7 @@
 <head>
     <title>City Wiki</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {% block extra_head %}{% endblock %}
     <style>
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         .city-list { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }

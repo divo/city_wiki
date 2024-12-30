@@ -10,6 +10,7 @@ from celery.result import AsyncResult
 from django.contrib import messages
 import logging
 from django.db.models import Count
+import json
 logger = logging.getLogger(__name__)
 
 def city_list(request):
@@ -126,3 +127,24 @@ def import_city(request):
             messages.error(request, f'Error importing {city_name}: {str(e)}')
     
     return redirect('city_list')
+
+def city_map(request, city_name):
+    city = get_object_or_404(City, name=city_name)
+    pois = city.points_of_interest.all()
+    
+    # Convert POIs to JSON for the template
+    pois_json = json.dumps([{
+        'name': poi.name,
+        'category': poi.category,
+        'sub_category': poi.sub_category,
+        'description': poi.description,
+        'latitude': poi.latitude,
+        'longitude': poi.longitude,
+        'address': poi.address,
+        'website': poi.website
+    } for poi in pois])
+    
+    return render(request, 'cities/city_map.html', {
+        'city': city,
+        'pois_json': pois_json
+    })

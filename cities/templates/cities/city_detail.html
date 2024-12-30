@@ -68,6 +68,13 @@
         </div>
     </div>
 
+    <div class="container mt-4">
+        <h1>{{ city.name }}</h1>
+        <div class="mb-4">
+            <a href="{% url 'city_map' city.name %}" class="btn btn-primary">View Map</a>
+        </div>
+    </div>
+
     {% for category, pois in pois_by_category.items %}
         <section class="category-section">
             <h2>{{ category|title }} ({{ pois|length }})</h2>
