@@ -55,18 +55,18 @@ class WikivoyageScraper:
         parsed = wtp.parse(wikitext)
         
         pois = []
-        district_pages = []
+        district_pages = set()  # Use a set to automatically deduplicate
         
         for section in parsed.sections:
             if section.title == "Districts":
                 for wikilink in section.wikilinks:
-                    district_pages.append(wikilink.title)
+                    district_pages.add(wikilink.title)
             else:
                 category = self._determine_category(section.title)
                 if category:
                     pois.extend(self._parse_section(section, category))
         
-        return pois, district_pages
+        return pois, list(district_pages)  # Convert back to list before returning
     
     def _determine_category(self, title: str) -> Optional[str]:
         if not title:
@@ -92,6 +92,9 @@ class WikivoyageScraper:
         seen_pois = set()  # Track POIs by (name, coords) to avoid duplicates
         rank = 0
         
+        logger.info(f"Starting to parse section: {section.title}")
+        logger.debug(f"Section has {len(section.sections)} subsections")
+        
         # Process subsections that are different from current section
         for subsection in section.sections:
             if subsection.string != section.string:
@@ -99,6 +102,10 @@ class WikivoyageScraper:
                 subsection_pois = self._parse_section(subsection, category)
                 for poi in subsection_pois:
                     poi_key = (poi.name, poi.coordinates if poi.coordinates else None)
+                    if poi.name == "Beat Museum":
+                        logger.warning(f"Found Beat Museum in subsection {subsection.title} of {section.title}")
+                        logger.warning(f"POI key: {poi_key}")
+                        logger.warning(f"Already seen: {poi_key in seen_pois}")
                     if poi_key not in seen_pois:
                         seen_pois.add(poi_key)
                         rank += 1
@@ -106,18 +113,26 @@ class WikivoyageScraper:
                         pois.append(poi)
         
         # Process templates in current section
+        logger.debug(f"Processing templates in section: {section.title}")
         for template in section.templates:
             if template.name.lower().strip() in ['listing', 'see', 'do', 'buy', 'eat', 'drink', 'sleep']:
+                logger.debug(f"Found template: {template.name} in {section.title}")
                 poi = self._parse_listing_template(template, category, rank + 1, section.title)
                 if poi:
+                    if poi.name == "Beat Museum":
+                        logger.warning(f"Found Beat Museum in section {section.title}")
+                        logger.warning(f"Template: {template.string}")
                     poi_key = (poi.name, poi.coordinates if poi.coordinates else None)
                     if poi_key not in seen_pois:
                         seen_pois.add(poi_key)
                         rank += 1
                         poi.rank = rank
-                        logger.info(f"Found POI in {section.title}: {poi.name}")
+                        logger.info(f"Added POI from section: {poi.name} (rank: {rank}) in {section.title}")
                         pois.append(poi)
+                    else:
+                        logger.warning(f"Duplicate POI found in section: {poi.name} in {section.title}")
         
+        logger.info(f"Finished parsing section: {section.title}, found {len(pois)} POIs")
         return pois
     
     def _get_section_templates(self, section: wtp.Section) -> List[wtp.Template]:
