@@ -54,7 +54,7 @@ class WikivoyageScraper:
         wikitext = response['parse']['wikitext']['*']
         parsed = wtp.parse(wikitext)
         
-        pois = []
+        poi_dict = {}  # key: name -> value: POI
         district_pages = set()  # Use a set to automatically deduplicate
         
         for section in parsed.sections:
@@ -64,9 +64,9 @@ class WikivoyageScraper:
             else:
                 category = self._determine_category(section.title)
                 if category:
-                    pois.extend(self._parse_section(section, category))
+                    self._parse_section(section, category, poi_dict)
         
-        return pois, list(district_pages)  # Convert back to list before returning
+        return list(poi_dict.values()), list(district_pages)  # Convert back to list before returning
     
     def _determine_category(self, title: str) -> Optional[str]:
         if not title:
@@ -78,7 +78,7 @@ class WikivoyageScraper:
                 return category
         return None
     
-    def _parse_section(self, section: wtp.Section, category: str) -> List[PointOfInterest]:
+    def _parse_section(self, section: wtp.Section, category: str, poi_dict: dict = None) -> List[PointOfInterest]:
         """Parse POIs from a section and its subsections, maintaining proper rank ordering.
         
         The function processes templates in bottom-up order:
@@ -88,31 +88,24 @@ class WikivoyageScraper:
         Note: In WikiTextParser, we've reached a leaf when section.sections returns
         the same content as its parent section.
         """
-        pois = []
-        rank = 0
+        if poi_dict is None:
+            poi_dict = {}  # key: name -> value: POI
         
         # Process subsections that are different from current section
         for subsection in section.sections:
             if subsection.string != section.string:
                 logger.info(f"Processing subsection: {subsection.title} in {section.title}")
-                subsection_pois = self._parse_section(subsection, category)
-                for poi in subsection_pois:
-                    if not any(existing.name == poi.name for existing in pois):
-                        rank += 1
-                        poi.rank = rank
-                        pois.append(poi)
+                self._parse_section(subsection, category, poi_dict)
         
         # Process templates in current section
         for template in section.templates:
             if template.name.lower().strip() in ['listing', 'see', 'do', 'buy', 'eat', 'drink', 'sleep']:
-                poi = self._parse_listing_template(template, category, rank + 1, section.title)
-                if poi and not any(existing.name == poi.name for existing in pois):
-                    rank += 1
-                    poi.rank = rank
+                poi = self._parse_listing_template(template, category, len(poi_dict) + 1, section.title)
+                if poi and poi.name not in poi_dict:
                     logger.info(f"Found POI in {section.title}: {poi.name}")
-                    pois.append(poi)
+                    poi_dict[poi.name] = poi
         
-        return pois
+        return list(poi_dict.values())
     
     def _get_section_templates(self, section: wtp.Section) -> List[wtp.Template]:
         """Get templates that belong directly to this section, excluding those from subsections."""
