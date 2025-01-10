@@ -168,6 +168,7 @@
 {% block content %}
 <div class="map-header">
     <h2>{{ city.name }} - Points of Interest Map</h2>
+    <a href="{% url 'city_detail' city.name %}" class="back-link">← Back to City Details</a>
     <div class="map-filters">
         <form method="get" class="filters-form">
             <div class="rank-filter">
