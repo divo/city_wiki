@@ -89,7 +89,6 @@ class WikivoyageScraper:
         the same content as its parent section.
         """
         pois = []
-        seen_pois = set()  # Track POIs by (name, coords) to avoid duplicates
         rank = 0
         
         # Process subsections that are different from current section
@@ -98,9 +97,7 @@ class WikivoyageScraper:
                 logger.info(f"Processing subsection: {subsection.title} in {section.title}")
                 subsection_pois = self._parse_section(subsection, category)
                 for poi in subsection_pois:
-                    poi_key = (poi.name, poi.coordinates if poi.coordinates else None)
-                    if poi_key not in seen_pois:
-                        seen_pois.add(poi_key)
+                    if not any(existing.name == poi.name for existing in pois):
                         rank += 1
                         poi.rank = rank
                         pois.append(poi)
@@ -109,14 +106,11 @@ class WikivoyageScraper:
         for template in section.templates:
             if template.name.lower().strip() in ['listing', 'see', 'do', 'buy', 'eat', 'drink', 'sleep']:
                 poi = self._parse_listing_template(template, category, rank + 1, section.title)
-                if poi:
-                    poi_key = (poi.name, poi.coordinates if poi.coordinates else None)
-                    if poi_key not in seen_pois:
-                        seen_pois.add(poi_key)
-                        rank += 1
-                        poi.rank = rank
-                        logger.info(f"Found POI in {section.title}: {poi.name}")
-                        pois.append(poi)
+                if poi and not any(existing.name == poi.name for existing in pois):
+                    rank += 1
+                    poi.rank = rank
+                    logger.info(f"Found POI in {section.title}: {poi.name}")
+                    pois.append(poi)
         
         return pois
     
