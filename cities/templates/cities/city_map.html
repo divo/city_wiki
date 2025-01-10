@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load city_tags %}
 
 {% block extra_head %}
 <!-- Mapbox CSS must come first -->
@@ -13,7 +14,7 @@
     }
     .map-container {
         position: absolute;
-        top: 160px;  /* Increased from 80px to make room for filters */
+        top: 200px;
         left: 20px;
         right: 20px;
         bottom: 20px;
@@ -118,6 +119,49 @@
         font-size: 0.9em;
         color: #666;
     }
+    
+    .filters-form {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .category-filter {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .category-checkboxes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    
+    .category-checkbox {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .category-checkbox:hover {
+        background: #e9ecef;
+    }
+    
+    .category-label {
+        font-size: 0.9em;
+        color: #333;
+    }
+    
+    .category-count {
+        font-size: 0.8em;
+        color: #666;
+    }
 </style>
 {% endblock %}
 
@@ -125,17 +169,37 @@
 <div class="map-header">
     <h2>{{ city.name }} - Points of Interest Map</h2>
     <div class="map-filters">
-        <form method="get" class="rank-filter">
-            <label for="max_rank">Max Rank:</label>
-            <select name="max_rank" id="max_rank" onchange="this.form.submit()">
-                <option value="0" {% if max_rank == 0 %}selected{% endif %}>All Ranks</option>
-                {% for i in "12345"|make_list %}
-                    <option value="{{ i }}" {% if max_rank == i|add:"0" %}selected{% endif %}>
-                        Rank {{ i }} or better
-                    </option>
-                {% endfor %}
-            </select>
+        <form method="get" class="filters-form">
+            <div class="rank-filter">
+                <label for="max_rank">Max Rank:</label>
+                <select name="max_rank" id="max_rank">
+                    <option value="0" {% if max_rank == 0 %}selected{% endif %}>All Ranks</option>
+                    {% for i in "12345"|make_list %}
+                        <option value="{{ i }}" {% if max_rank == i|add:"0" %}selected{% endif %}>
+                            Rank {{ i }} or better
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="category-filter">
+                <label>Categories:</label>
+                <div class="category-checkboxes">
+                    {% for cat_id, cat_name in categories %}
+                        <label class="category-checkbox">
+                            <input type="checkbox" 
+                                   name="categories" 
+                                   value="{{ cat_id }}"
+                                   {% if cat_id in selected_categories %}checked{% endif %}
+                                   onchange="this.form.submit()">
+                            <span class="category-label">{{ cat_name }}</span>
+                            <span class="category-count">({{ category_counts|get_item:cat_id|default:0 }})</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
         </form>
+        
         <div class="rank-counts">
             {% for rank_info in rank_counts %}
                 <span class="rank-count">Rank {{ rank_info.rank }}: {{ rank_info.count }} POIs</span>

@@ -137,8 +137,11 @@ def city_map(request, city_name):
     except ValueError:
         max_rank = 0
     
-    # Filter POIs by rank if specified
-    pois = city.points_of_interest.all()
+    # Get selected categories (default to all if none selected)
+    selected_categories = request.GET.getlist('categories') or [cat[0] for cat in PointOfInterest.CATEGORIES]
+    
+    # Filter POIs by rank and categories
+    pois = city.points_of_interest.filter(category__in=selected_categories)
     if max_rank > 0:
         pois = pois.filter(rank__lte=max_rank)
     
@@ -150,9 +153,15 @@ def city_map(request, city_name):
     }
     
     # Get rank counts for the filter UI
-    rank_counts = list(city.points_of_interest.values('rank')
+    rank_counts = list(city.points_of_interest.filter(category__in=selected_categories)
+                      .values('rank')
                       .annotate(count=Count('rank'))
                       .order_by('rank'))
+    
+    # Get category counts
+    category_counts = list(city.points_of_interest.values('category')
+                         .annotate(count=Count('category'))
+                         .order_by('category'))
     
     # Convert POIs to JSON for the template
     pois_json = json.dumps([{
@@ -171,5 +180,8 @@ def city_map(request, city_name):
         'pois_json': pois_json,
         'center': center,
         'max_rank': max_rank,
-        'rank_counts': rank_counts
+        'rank_counts': rank_counts,
+        'categories': PointOfInterest.CATEGORIES,
+        'selected_categories': selected_categories,
+        'category_counts': {item['category']: item['count'] for item in category_counts}
     })
