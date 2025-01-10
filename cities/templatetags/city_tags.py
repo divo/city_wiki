@@ -6,7 +6,7 @@ register = template.Library()
 @register.filter
 def get_item(dictionary, key):
     """Get an item from a dictionary using bracket notation in templates"""
-    return dictionary.get(key, None)
+    return dictionary.get(key, []) 
 
 @register.filter
 def items(dictionary):
@@ -22,3 +22,7 @@ def pprint(value):
 def split(value, arg):
     """Split a string and return the list"""
     return value.split(arg) 
+@register.filter
+def get_item(dictionary, key):
+    """Get an item from a dictionary using bracket notation."""
+    return dictionary.get(key, None) 
