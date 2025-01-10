@@ -130,7 +130,17 @@ def import_city(request):
 
 def city_map(request, city_name):
     city = get_object_or_404(City, name=city_name)
+    
+    # Get max_rank filter from query params
+    try:
+        max_rank = int(request.GET.get('max_rank', 0))
+    except ValueError:
+        max_rank = 0
+    
+    # Filter POIs by rank if specified
     pois = city.points_of_interest.all()
+    if max_rank > 0:
+        pois = pois.filter(rank__lte=max_rank)
     
     # Find first POI with coordinates to center the map
     center_poi = pois.exclude(latitude=None, longitude=None).first()
@@ -138,6 +148,11 @@ def city_map(request, city_name):
         'longitude': center_poi.longitude if center_poi else 2.3522,  # Paris default
         'latitude': center_poi.latitude if center_poi else 48.8566
     }
+    
+    # Get rank counts for the filter UI
+    rank_counts = list(city.points_of_interest.values('rank')
+                      .annotate(count=Count('rank'))
+                      .order_by('rank'))
     
     # Convert POIs to JSON for the template
     pois_json = json.dumps([{
@@ -154,5 +169,7 @@ def city_map(request, city_name):
     return render(request, 'cities/city_map.html', {
         'city': city,
         'pois_json': pois_json,
-        'center': center
+        'center': center,
+        'max_rank': max_rank,
+        'rank_counts': rank_counts
     })

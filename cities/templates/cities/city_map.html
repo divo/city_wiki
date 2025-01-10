@@ -13,7 +13,7 @@
     }
     .map-container {
         position: absolute;
-        top: 80px;  /* Space for header */
+        top: 160px;  /* Increased from 80px to make room for filters */
         left: 20px;
         right: 20px;
         bottom: 20px;
@@ -80,12 +80,68 @@
         font-size: 0.9em;
         margin-bottom: 8px;
     }
+    .map-filters {
+        margin-top: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .rank-filter {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .rank-filter select {
+        padding: 5px 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: white;
+    }
+    
+    .rank-filter label {
+        font-weight: bold;
+        color: #333;
+    }
+    
+    .rank-counts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .rank-count {
+        background: #f0f0f0;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.9em;
+        color: #666;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="map-header">
     <h2>{{ city.name }} - Points of Interest Map</h2>
+    <div class="map-filters">
+        <form method="get" class="rank-filter">
+            <label for="max_rank">Max Rank:</label>
+            <select name="max_rank" id="max_rank" onchange="this.form.submit()">
+                <option value="0" {% if max_rank == 0 %}selected{% endif %}>All Ranks</option>
+                {% for i in "12345"|make_list %}
+                    <option value="{{ i }}" {% if max_rank == i|add:"0" %}selected{% endif %}>
+                        Rank {{ i }} or better
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+        <div class="rank-counts">
+            {% for rank_info in rank_counts %}
+                <span class="rank-count">Rank {{ rank_info.rank }}: {{ rank_info.count }} POIs</span>
+            {% endfor %}
+        </div>
+    </div>
 </div>
 <div class="map-container">
     <div id="map"></div>
