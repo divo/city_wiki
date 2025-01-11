@@ -18,7 +18,11 @@
                             Sub-category {% if sort_by == 'sub_category' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
-                    <th>District</th>
+                    <th>
+                        <a href="?sort=district&dir={% if sort_by == 'district' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                            District {% if sort_by == 'district' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
+                        </a>
+                    </th>
                     <th>
                         <a href="?sort=description&dir={% if sort_by == 'description' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
                             Description {% if sort_by == 'description' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
