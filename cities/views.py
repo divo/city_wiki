@@ -164,13 +164,26 @@ def city_map(request, city_name):
     except ValueError:
         max_rank = 0
     
+    # Get district filter
+    district_id = request.GET.get('district', '')
+    
     # Get selected categories (default to all if none selected)
     selected_categories = request.GET.getlist('categories') or [cat[0] for cat in PointOfInterest.CATEGORIES]
+    
+    # Get all districts for the filter dropdown
+    districts = city.districts.all().order_by('name')
     
     # Filter POIs by rank and categories
     pois = city.points_of_interest.filter(category__in=selected_categories)
     if max_rank > 0:
         pois = pois.filter(rank__lte=max_rank)
+        
+    # Apply district filter if specified
+    if district_id:
+        if district_id == 'main':
+            pois = pois.filter(district__isnull=True)
+        else:
+            pois = pois.filter(district_id=district_id)
     
     # Find first POI with coordinates to center the map
     center_poi = pois.exclude(latitude=None, longitude=None).first()
@@ -210,5 +223,7 @@ def city_map(request, city_name):
         'rank_counts': rank_counts,
         'categories': PointOfInterest.CATEGORIES,
         'selected_categories': selected_categories,
-        'category_counts': {item['category']: item['count'] for item in category_counts}
+        'category_counts': {item['category']: item['count'] for item in category_counts},
+        'districts': districts,
+        'selected_district': district_id,
     })

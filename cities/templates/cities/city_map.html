@@ -181,6 +181,17 @@
                         </option>
                     {% endfor %}
                 </select>
+
+                <label for="district" class="ml-4">District:</label>
+                <select name="district" id="district" onchange="this.form.submit()">
+                    <option value="">All Districts</option>
+                    <option value="main" {% if selected_district == 'main' %}selected{% endif %}>Main City</option>
+                    {% for district in districts %}
+                        <option value="{{ district.id }}" {% if selected_district == district.id|stringformat:"s" %}selected{% endif %}>
+                            {{ district.name }}
+                        </option>
+                    {% endfor %}
+                </select>
             </div>
             
             <div class="category-filter">
