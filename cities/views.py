@@ -68,9 +68,15 @@ def city_detail(request, city_name):
     except ValueError:
         max_rank = 0
     
+    # Get district filter
+    district_id = request.GET.get('district', '')
+    
     # Get sort parameters
     sort_by = request.GET.get('sort', 'name')
     sort_dir = request.GET.get('dir', 'asc')
+    
+    # Get all districts for the filter dropdown
+    districts = city.districts.all().order_by('name')
     
     # Get all POIs for this city, organized by category
     pois_by_category = {}
@@ -84,6 +90,13 @@ def city_detail(request, city_name):
         # Apply rank filter if specified
         if max_rank > 0:
             pois = pois.filter(rank__lte=max_rank)
+            
+        # Apply district filter if specified
+        if district_id:
+            if district_id == 'main':
+                pois = pois.filter(district__isnull=True)
+            else:
+                pois = pois.filter(district_id=district_id)
         
         # Apply sorting
         order_by = [f"{'-' if sort_dir == 'desc' else ''}{sort_by}"]
@@ -106,6 +119,8 @@ def city_detail(request, city_name):
         'max_rank': max_rank,
         'sort_by': sort_by,
         'sort_dir': sort_dir,
+        'districts': districts,
+        'selected_district': district_id,
     })
 
 @csrf_exempt  # TODO: Replace with proper admin authentication
