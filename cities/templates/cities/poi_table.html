@@ -4,53 +4,53 @@
             <thead>
                 <tr>
                     <th>
-                        <a href="?sort=name&dir={% if sort_by == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=name&dir={% if sort_by == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Name {% if sort_by == 'name' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort=rank&dir={% if sort_by == 'rank' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=rank&dir={% if sort_by == 'rank' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Rank {% if sort_by == 'rank' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort=sub_category&dir={% if sort_by == 'sub_category' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=sub_category&dir={% if sort_by == 'sub_category' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Sub-category {% if sort_by == 'sub_category' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort=district&dir={% if sort_by == 'district' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=district&dir={% if sort_by == 'district' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             District {% if sort_by == 'district' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort=description&dir={% if sort_by == 'description' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=description&dir={% if sort_by == 'description' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Description {% if sort_by == 'description' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
                     <th>Coords</th>
                     <th>
-                        <a href="?sort=address&dir={% if sort_by == 'address' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=address&dir={% if sort_by == 'address' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Address {% if sort_by == 'address' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort=phone&dir={% if sort_by == 'phone' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=phone&dir={% if sort_by == 'phone' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Contact {% if sort_by == 'phone' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort=hours&dir={% if sort_by == 'hours' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=hours&dir={% if sort_by == 'hours' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Hours {% if sort_by == 'hours' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort=website&dir={% if sort_by == 'website' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=website&dir={% if sort_by == 'website' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Website {% if sort_by == 'website' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort=created_at&dir={% if sort_by == 'created_at' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}">
+                        <a href="?sort=created_at&dir={% if sort_by == 'created_at' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Created at {% if sort_by == 'created_at' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
