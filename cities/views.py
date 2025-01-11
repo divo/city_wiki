@@ -68,6 +68,10 @@ def city_detail(request, city_name):
     except ValueError:
         max_rank = 0
     
+    # Get sort parameters
+    sort_by = request.GET.get('sort', 'name')
+    sort_dir = request.GET.get('dir', 'asc')
+    
     # Get all POIs for this city, organized by category
     pois_by_category = {}
     category_rank_counts = {}
@@ -75,11 +79,17 @@ def city_detail(request, city_name):
         # Base query with sorting
         pois = city.points_of_interest.filter(
             category=category
-        ).select_related('district').order_by('name', 'rank')
+        ).select_related('district')
         
         # Apply rank filter if specified
         if max_rank > 0:
             pois = pois.filter(rank__lte=max_rank)
+        
+        # Apply sorting
+        order_by = [f"{'-' if sort_dir == 'desc' else ''}{sort_by}"]
+        if sort_by != 'name':  # Add name as secondary sort
+            order_by.append('name')
+        pois = pois.order_by(*order_by)
         
         pois_by_category[category] = pois
         
@@ -94,6 +104,8 @@ def city_detail(request, city_name):
         'pois_by_category': pois_by_category,
         'category_rank_counts': category_rank_counts,
         'max_rank': max_rank,
+        'sort_by': sort_by,
+        'sort_dir': sort_dir,
     })
 
 @csrf_exempt  # TODO: Replace with proper admin authentication
