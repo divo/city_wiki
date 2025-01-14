@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from data_processing.wikivoyage_scraper import WikivoyageScraper
-from .models import PointOfInterest, City
+from .models import PointOfInterest, City, District
 from django.db import transaction, models
 from .tasks import import_city_data
 from celery.result import AsyncResult
@@ -11,6 +11,9 @@ from django.contrib import messages
 import logging
 from django.db.models import Count
 import json
+from django.forms.models import model_to_dict
+from django.core.serializers.json import DjangoJSONEncoder
+
 logger = logging.getLogger(__name__)
 
 def city_list(request):
@@ -227,3 +230,38 @@ def city_map(request, city_name):
         'districts': districts,
         'selected_district': district_id,
     })
+
+@require_http_methods(["GET"])
+def dump_city(request, city_name):
+    """Return a JSON dump of all data for a specific city."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+        
+        # Prepare the data structure
+        data = {
+            'city': model_to_dict(city, exclude=['id']),
+            'districts': [],
+            'points_of_interest': []
+        }
+
+        # Add districts
+        for district in city.districts.all():
+            district_data = model_to_dict(district, exclude=['id', 'city'])
+            if district.parent_district:
+                district_data['parent_district'] = district.parent_district.name
+            data['districts'].append(district_data)
+
+        # Add POIs
+        for poi in city.points_of_interest.all():
+            poi_data = model_to_dict(poi, exclude=['id', 'city'])
+            if poi.district:
+                poi_data['district'] = poi.district.name
+            data['points_of_interest'].append(poi_data)
+
+        return JsonResponse(data, json_dumps_params={'cls': DjangoJSONEncoder, 'indent': 2})
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
