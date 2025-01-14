@@ -4,6 +4,7 @@ import json
 from django.core.serializers.json import DjangoJSONEncoder
 from django.forms.models import model_to_dict
 
+# Example: python manage.py dump_city "Paris" --output paris_data.json
 class Command(BaseCommand):
     help = 'Dumps all data for a specific city in JSON format'
 
