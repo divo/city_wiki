@@ -251,8 +251,8 @@ def dump_city(request, city_name):
                 district_data['parent_district'] = district.parent_district.name
             data['districts'].append(district_data)
 
-        # Add POIs
-        for poi in city.points_of_interest.all():
+        # Add POIs - only those with coordinates
+        for poi in city.points_of_interest.filter(latitude__isnull=False, longitude__isnull=False):
             poi_data = model_to_dict(poi, exclude=['id', 'city'])
             if poi.district:
                 poi_data['district'] = poi.district.name
