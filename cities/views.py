@@ -258,7 +258,7 @@ def dump_city(request, city_name):
                 poi_data['district'] = poi.district.name
             data['points_of_interest'].append(poi_data)
 
-        return JsonResponse(data, json_dumps_params={'cls': DjangoJSONEncoder, 'indent': 2})
+        return JsonResponse(data, encoder=DjangoJSONEncoder, json_dumps_params={'indent': 2})
         
     except Exception as e:
         return JsonResponse({
