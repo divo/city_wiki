@@ -265,3 +265,33 @@ def dump_city(request, city_name):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+@require_http_methods(["GET"])
+def city_list_json(request):
+    """Return a JSON list of all cities in the database."""
+    try:
+        cities = City.objects.all()
+        city_data = []
+        
+        for city in cities:
+            poi_count = city.points_of_interest.filter(latitude__isnull=False, longitude__isnull=False).count()
+            city_data.append({
+                'name': city.name,
+                'country': city.country,
+                'latitude': city.latitude,
+                'longitude': city.longitude,
+                'district_count': city.districts.count(),
+                'poi_count': poi_count,
+                'created_at': city.created_at,
+                'updated_at': city.updated_at,
+            })
+            
+        return JsonResponse({
+            'cities': city_data
+        }, encoder=DjangoJSONEncoder, json_dumps_params={'indent': 2})
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
