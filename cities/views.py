@@ -13,6 +13,8 @@ from django.db.models import Count
 import json
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
+from django.conf import settings
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -295,3 +297,88 @@ def city_list_json(request):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_text(request, city_name):
+    """Generate text using OpenAI's API based on city data."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+        
+        # Get POIs with coordinates
+        pois = city.points_of_interest.filter(
+            latitude__isnull=False, 
+            longitude__isnull=False
+        ).select_related('district')
+        
+        # Prepare POI data - just names grouped by category and district
+        poi_data = {}
+        for poi in pois:
+            category = poi.category
+            district = poi.district.name if poi.district else 'Main City'
+            
+            if category not in poi_data:
+                poi_data[category] = {}
+            
+            if district not in poi_data[category]:
+                poi_data[category][district] = []
+                
+            poi_data[category][district].append(poi.name)
+        
+        # Initialize OpenAI client
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        
+        # Get the prompt from the request
+        prompt = request.POST.get('prompt', '')
+        if not prompt:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No prompt provided'
+            }, status=400)
+            
+        # Create system message with city context
+        system_message = f"""You are an AI assistant helping to analyze data about {city.name}.
+The city has {len(pois)} points of interest with valid coordinates, organized by category and district.
+Your task is to provide insights and analysis based on this data."""
+        
+        # Make the API call
+        response = client.chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": f"City data: {json.dumps(poi_data, indent=2)}\n\nPrompt: {prompt}"}
+            ],
+            temperature=0.7,
+        )
+        
+        return JsonResponse({
+            'status': 'success',
+            'city': city.name,
+            'response': response.choices[0].message.content,
+            'prompt': prompt,
+            'model': settings.OPENAI_MODEL,
+        }, json_dumps_params={'indent': 2})
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+def generate_text_view(request):
+    """Render the text generation interface."""
+    # Get all cities with their POI counts
+    cities = []
+    for city in City.objects.all():
+        poi_count = city.points_of_interest.filter(
+            latitude__isnull=False, 
+            longitude__isnull=False
+        ).count()
+        cities.append({
+            'name': city.name,
+            'poi_count': poi_count
+        })
+    
+    return render(request, 'cities/generate.html', {
+        'cities': sorted(cities, key=lambda x: x['name'])
+    })

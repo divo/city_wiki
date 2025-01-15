@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .generate-container {
+        max-width: 800px;
+        margin: 40px auto;
+        padding: 20px;
+    }
+    
+    .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+    }
+    
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 16px;
+    }
+    
+    .form-group textarea {
+        min-height: 120px;
+        resize: vertical;
+    }
+    
+    .generate-btn {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+    
+    .generate-btn:hover {
+        background: #0056b3;
+    }
+    
+    .generate-btn:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+    
+    .response-container {
+        margin-top: 30px;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        display: none;
+    }
+    
+    .error-message {
+        color: #dc3545;
+        margin-top: 10px;
+        padding: 10px;
+        background: #f8d7da;
+        border-radius: 4px;
+        display: none;
+    }
+    
+    .loading {
+        display: none;
+        margin-top: 20px;
+        text-align: center;
+    }
+    
+    .loading::after {
+        content: "...";
+        animation: dots 1s steps(5, end) infinite;
+    }
+    
+    @keyframes dots {
+        0%, 20% { content: "."; }
+        40% { content: ".."; }
+        60%, 100% { content: "..."; }
+    }
+</style>
+
+<div class="generate-container">
+    <h1>Generate Text Analysis</h1>
+    
+    <form id="generateForm">
+        <div class="form-group">
+            <label for="citySelect">Select City:</label>
+            <select id="citySelect" name="city" required>
+                <option value="">Choose a city...</option>
+                {% for city in cities %}
+                    <option value="{{ city.name }}">{{ city.name }} ({{ city.poi_count }} POIs)</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="prompt">Prompt:</label>
+            <textarea id="prompt" name="prompt" required
+                      placeholder="Enter your prompt here. For example: 'Analyze the distribution of restaurants across different districts'"></textarea>
+        </div>
+        
+        <button type="submit" class="generate-btn" id="generateBtn">Generate Analysis</button>
+    </form>
+    
+    <div class="loading" id="loading">Generating response</div>
+    <div class="error-message" id="errorMessage"></div>
+    <div class="response-container" id="responseContainer"></div>
+</div>
+
+<script>
+document.getElementById('generateForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const citySelect = document.getElementById('citySelect');
+    const prompt = document.getElementById('prompt').value;
+    const generateBtn = document.getElementById('generateBtn');
+    const loading = document.getElementById('loading');
+    const errorMessage = document.getElementById('errorMessage');
+    const responseContainer = document.getElementById('responseContainer');
+    
+    // Reset UI
+    errorMessage.style.display = 'none';
+    responseContainer.style.display = 'none';
+    generateBtn.disabled = true;
+    loading.style.display = 'block';
+    
+    try {
+        const response = await fetch(`/city/${encodeURIComponent(citySelect.value)}/generate/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `prompt=${encodeURIComponent(prompt)}`
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            responseContainer.textContent = data.response;
+            responseContainer.style.display = 'block';
+        } else {
+            throw new Error(data.message || 'Failed to generate text');
+        }
+    } catch (error) {
+        errorMessage.textContent = error.message;
+        errorMessage.style.display = 'block';
+    } finally {
+        generateBtn.disabled = false;
+        loading.style.display = 'none';
+    }
+});
+</script>
+{% endblock %} 

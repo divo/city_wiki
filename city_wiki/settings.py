@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-_*_j&m7-cog_(alc0216!7ij-k!)6ib=ky@6)l0*lk$hux-i$v
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['192.168.1.164', 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -133,3 +133,7 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
+
+# OpenAI Configuration
+OPENAI_API_KEY = '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'  # Set this in your environment or local_settings.py
+OPENAI_MODEL = 'gpt-4-turbo-preview'  # Default model to use
