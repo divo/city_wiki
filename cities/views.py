@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from data_processing.wikivoyage_scraper import WikivoyageScraper
-from .models import PointOfInterest, City, District
+from .models import PointOfInterest, City, District, PoiList
 from django.db import transaction, models
 from .tasks import import_city_data
 from celery.result import AsyncResult

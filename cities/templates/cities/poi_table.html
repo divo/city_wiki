@@ -866,7 +866,7 @@
         }
 
         async function createList() {
-            const selectedIds = Array.from(document.querySelectorAll('input[name="poi_checkbox"]:checked')).map(cb => cb.value);
+            const selectedIds = Array.from(selectedRows);
             const title = document.getElementById('listTitle').value.trim();
             
             if (!title) {
@@ -884,6 +884,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     },
                     body: JSON.stringify({
                         title: title,
@@ -895,8 +896,10 @@
                 if (data.status === 'success') {
                     alert('List created successfully');
                     document.getElementById('listTitle').value = '';
-                    // Uncheck all checkboxes
-                    document.querySelectorAll('input[name="poi_checkbox"]').forEach(cb => cb.checked = false);
+                    // Clear selections
+                    selectedRows.clear();
+                    document.querySelectorAll('.select-checkbox').forEach(cb => cb.checked = false);
+                    document.querySelector('.select-all-checkbox').checked = false;
                     updateSelectionUI();
                 } else {
                     alert('Error creating list: ' + data.message);
