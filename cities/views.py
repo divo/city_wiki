@@ -684,3 +684,81 @@ def check_task_status(request, task_id):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def fetch_poi_image(request, city_name, poi_id):
+    """Fetch and save an image URL for a POI."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+        poi = get_object_or_404(PointOfInterest, id=poi_id, city=city)
+        
+        # Search Wikimedia Commons
+        search_query = poi.name.replace(' ', '+')
+        api_url = f"https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch={search_query}&srnamespace=6&format=json&origin=*"
+        
+        import requests
+        response = requests.get(api_url)
+        data = response.json()
+        
+        if data.get('query', {}).get('search'):
+            # Get the first result
+            first_result = data['query']['search'][0]
+            title = first_result['title']
+            
+            # Get image info for the first result
+            file_url = f"https://commons.wikimedia.org/w/api.php?action=query&titles={title}&prop=imageinfo&iiprop=url&format=json&origin=*"
+            file_response = requests.get(file_url)
+            file_data = file_response.json()
+            
+            # Extract the image URL
+            pages = file_data.get('query', {}).get('pages', {})
+            if pages:
+                page = next(iter(pages.values()))
+                image_info = page.get('imageinfo', [{}])[0]
+                image_url = image_info.get('url')
+                
+                if image_url:
+                    # Save the image URL to the POI
+                    poi.image_url = image_url
+                    poi.save()
+                    
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': 'Image URL updated',
+                        'image_url': image_url
+                    })
+        
+        return JsonResponse({
+            'status': 'error',
+            'message': 'No suitable image found'
+        }, status=404)
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def delete_poi_image(request, city_name, poi_id):
+    """Delete the image URL from a POI."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+        poi = get_object_or_404(PointOfInterest, id=poi_id, city=city)
+        
+        # Clear the image URL
+        poi.image_url = None
+        poi.save()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Image URL removed'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
