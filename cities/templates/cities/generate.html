@@ -56,7 +56,6 @@
         padding: 20px;
         background: #f8f9fa;
         border-radius: 4px;
-        white-space: pre-wrap;
         display: none;
     }
     
@@ -85,6 +84,124 @@
         40% { content: ".."; }
         60%, 100% { content: "..."; }
     }
+
+    .analysis-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .analysis-section h2 {
+        margin-top: 0;
+        color: #2c3e50;
+        font-size: 1.5em;
+    }
+
+    .key-findings {
+        list-style-type: none;
+        padding-left: 0;
+    }
+
+    .key-findings li {
+        margin-bottom: 8px;
+        padding-left: 20px;
+        position: relative;
+    }
+
+    .key-findings li::before {
+        content: "•";
+        position: absolute;
+        left: 0;
+        color: #007bff;
+    }
+
+    .recommendations {
+        list-style-type: none;
+        padding-left: 0;
+    }
+
+    .recommendation-item {
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .recommendation-title {
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 5px;
+    }
+
+    .highlights {
+        list-style-type: none;
+        padding-left: 0;
+        margin-top: 10px;
+    }
+
+    .highlights li {
+        margin-bottom: 5px;
+        padding-left: 15px;
+        position: relative;
+    }
+
+    .highlights li::before {
+        content: "→";
+        position: absolute;
+        left: 0;
+        color: #6c757d;
+    }
+
+    .raw-json {
+        margin-top: 20px;
+        padding: 10px;
+        background: #2c3e50;
+        color: #fff;
+        border-radius: 4px;
+        font-family: monospace;
+        display: none;
+    }
+
+    .toggle-raw-json {
+        margin-top: 10px;
+        background: none;
+        border: 1px solid #ddd;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .toggle-raw-json:hover {
+        background: #f8f9fa;
+    }
+
+    .validation-details {
+        margin-top: 10px;
+    }
+
+    .validation-details h3 {
+        font-size: 1.1em;
+        color: #2c3e50;
+        margin-bottom: 10px;
+    }
+
+    .mentioned-pois {
+        list-style-type: none;
+        padding-left: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .mentioned-pois li {
+        background: #e9ecef;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.9em;
+        color: #495057;
+    }
 </style>
 
 <div class="generate-container">
@@ -112,7 +229,46 @@
     
     <div class="loading" id="loading">Generating response</div>
     <div class="error-message" id="errorMessage"></div>
-    <div class="response-container" id="responseContainer"></div>
+    <div class="response-container" id="responseContainer">
+        <div class="analysis-section">
+            <h2>Summary</h2>
+            <p id="summary"></p>
+        </div>
+
+        <div class="analysis-section">
+            <h2>Key Findings</h2>
+            <ul class="key-findings" id="keyFindings"></ul>
+        </div>
+
+        <div class="analysis-section">
+            <h2>Category Distribution</h2>
+            <p id="categoryDescription"></p>
+            <ul class="highlights" id="categoryHighlights"></ul>
+        </div>
+
+        <div class="analysis-section">
+            <h2>District Insights</h2>
+            <p id="districtDescription"></p>
+            <ul class="highlights" id="districtHighlights"></ul>
+        </div>
+
+        <div class="analysis-section">
+            <h2>Recommendations</h2>
+            <div class="recommendations" id="recommendations"></div>
+        </div>
+
+        <div class="analysis-section">
+            <h2>Validation</h2>
+            <p>POIs referenced in analysis: <span id="mentionedPoisCount"></span> out of <span id="totalPoisCount"></span></p>
+            <div class="validation-details">
+                <h3>Referenced POIs:</h3>
+                <ul class="mentioned-pois" id="mentionedPois"></ul>
+            </div>
+        </div>
+
+        <button class="toggle-raw-json" onclick="toggleRawJson()">Toggle Raw JSON</button>
+        <pre class="raw-json" id="rawJson"></pre>
+    </div>
 </div>
 
 <script>
@@ -144,7 +300,57 @@ document.getElementById('generateForm').addEventListener('submit', async functio
         const data = await response.json();
         
         if (response.ok) {
-            responseContainer.textContent = data.response;
+            // Display the structured response
+            const analysis = data.analysis;
+            
+            // Update summary
+            document.getElementById('summary').textContent = analysis.summary;
+            
+            // Update key findings
+            const keyFindingsList = document.getElementById('keyFindings');
+            keyFindingsList.innerHTML = analysis.key_findings
+                .map(finding => `<li>${finding}</li>`)
+                .join('');
+            
+            // Update category distribution
+            document.getElementById('categoryDescription').textContent = 
+                analysis.analysis.category_distribution.description;
+            document.getElementById('categoryHighlights').innerHTML = 
+                analysis.analysis.category_distribution.highlights
+                    .map(highlight => `<li>${highlight}</li>`)
+                    .join('');
+            
+            // Update district insights
+            document.getElementById('districtDescription').textContent = 
+                analysis.analysis.district_insights.description;
+            document.getElementById('districtHighlights').innerHTML = 
+                analysis.analysis.district_insights.highlights
+                    .map(highlight => `<li>${highlight}</li>`)
+                    .join('');
+            
+            // Update recommendations
+            document.getElementById('recommendations').innerHTML = 
+                analysis.analysis.recommendations
+                    .map(rec => `
+                        <div class="recommendation-item">
+                            <div class="recommendation-title">${rec.title}</div>
+                            <div>${rec.description}</div>
+                        </div>
+                    `)
+                    .join('');
+            
+            // Update validation information
+            document.getElementById('mentionedPoisCount').textContent = analysis._validation.mentioned_pois;
+            document.getElementById('totalPoisCount').textContent = analysis._validation.total_pois;
+            document.getElementById('mentionedPois').innerHTML = 
+                analysis._validation.mentioned_poi_names
+                    .map(poi => `<li>${poi}</li>`)
+                    .join('');
+            
+            // Update raw JSON
+            document.getElementById('rawJson').textContent = 
+                JSON.stringify(analysis, null, 2);
+            
             responseContainer.style.display = 'block';
         } else {
             throw new Error(data.message || 'Failed to generate text');
@@ -157,5 +363,10 @@ document.getElementById('generateForm').addEventListener('submit', async functio
         loading.style.display = 'none';
     }
 });
+
+function toggleRawJson() {
+    const rawJson = document.getElementById('rawJson');
+    rawJson.style.display = rawJson.style.display === 'none' ? 'block' : 'none';
+}
 </script>
 {% endblock %} 

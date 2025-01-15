@@ -301,7 +301,7 @@ def city_list_json(request):
 @csrf_exempt
 @require_http_methods(["POST"])
 def generate_text(request, city_name):
-    """Generate text using OpenAI's API based on city data."""
+    """Generate structured JSON analysis using OpenAI's API based on city data."""
     try:
         city = get_object_or_404(City, name=city_name)
         
@@ -313,6 +313,7 @@ def generate_text(request, city_name):
         
         # Prepare POI data - just names grouped by category and district
         poi_data = {}
+        all_poi_names = set()  # Track all POI names for validation
         for poi in pois:
             category = poi.category
             district = poi.district.name if poi.district else 'Main City'
@@ -324,6 +325,7 @@ def generate_text(request, city_name):
                 poi_data[category][district] = []
                 
             poi_data[category][district].append(poi.name)
+            all_poi_names.add(poi.name)
         
         # Initialize OpenAI client
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
@@ -336,10 +338,48 @@ def generate_text(request, city_name):
                 'message': 'No prompt provided'
             }, status=400)
             
-        # Create system message with city context
+        # Create system message with city context and JSON structure requirements
         system_message = f"""You are an AI assistant helping to analyze data about {city.name}.
 The city has {len(pois)} points of interest with valid coordinates, organized by category and district.
-Your task is to provide insights and analysis based on this data."""
+
+CRITICAL: When mentioning specific locations in your analysis, you MUST ONLY use the exact names of POIs provided in the data. Do not make up or reference any locations that aren't in the provided dataset.
+
+Your task is to provide insights and analysis based on this data.
+
+IMPORTANT: You must respond with valid JSON only. Your response should follow this structure:
+{{
+    "summary": "A brief overview of the analysis",
+    "key_findings": [
+        "Finding 1 (reference specific POIs by their exact names)",
+        "Finding 2 (reference specific POIs by their exact names)",
+        ...
+    ],
+    "analysis": {{
+        "category_distribution": {{
+            "description": "Analysis of POI distribution across categories",
+            "highlights": [
+                "Highlight 1 (reference specific POIs by their exact names)",
+                ...
+            ]
+        }},
+        "district_insights": {{
+            "description": "Analysis of district-specific patterns",
+            "highlights": [
+                "Highlight 1 (reference specific POIs by their exact names)",
+                ...
+            ]
+        }},
+        "recommendations": [
+            {{
+                "title": "Recommendation title (reference specific POIs)",
+                "description": "Detailed explanation (reference specific POIs)"
+            }},
+            ...
+        ]
+    }}
+}}
+
+Remember: All POIs mentioned must be from this exact list: {sorted(list(all_poi_names))}"""
         
         # Make the API call
         response = client.chat.completions.create(
@@ -349,15 +389,40 @@ Your task is to provide insights and analysis based on this data."""
                 {"role": "user", "content": f"City data: {json.dumps(poi_data, indent=2)}\n\nPrompt: {prompt}"}
             ],
             temperature=0.7,
+            response_format={ "type": "json_object" }
         )
         
-        return JsonResponse({
-            'status': 'success',
-            'city': city.name,
-            'response': response.choices[0].message.content,
-            'prompt': prompt,
-            'model': settings.OPENAI_MODEL,
-        }, json_dumps_params={'indent': 2})
+        # Parse the response to ensure it's valid JSON
+        try:
+            analysis_data = json.loads(response.choices[0].message.content)
+            
+            # Validate that all POIs mentioned exist in our dataset
+            response_text = json.dumps(analysis_data)
+            mentioned_pois = set()
+            for poi_name in all_poi_names:
+                if poi_name in response_text:
+                    mentioned_pois.add(poi_name)
+            
+            # Add validation info to the response
+            analysis_data['_validation'] = {
+                'total_pois': len(all_poi_names),
+                'mentioned_pois': len(mentioned_pois),
+                'mentioned_poi_names': sorted(list(mentioned_pois))
+            }
+            
+            return JsonResponse({
+                'status': 'success',
+                'city': city.name,
+                'analysis': analysis_data,
+                'prompt': prompt,
+                'model': settings.OPENAI_MODEL,
+            }, json_dumps_params={'indent': 2})
+        except json.JSONDecodeError as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Failed to parse AI response as JSON',
+                'raw_response': response.choices[0].message.content
+            }, status=500)
         
     except Exception as e:
         return JsonResponse({
