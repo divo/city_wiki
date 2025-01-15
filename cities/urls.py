@@ -16,4 +16,5 @@ urlpatterns = [
     path('city/<str:city_name>/poi/<int:poi_id>/history/', views.poi_history, name='poi_history'),
     path('city/<str:city_name>/poi/<int:poi_id>/revert/<int:revision_id>/', views.poi_revert, name='poi_revert'),
     path('city/<str:city_name>/poi/<int:poi_id>/edit/', views.poi_edit, name='poi_edit'),
+    path('city/<str:city_name>/poi/<int:poi_id>/', views.poi_detail, name='poi_detail'),
 ]

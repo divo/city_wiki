@@ -433,3 +433,27 @@ def poi_edit(request, city_name, poi_id):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+@require_http_methods(["GET"])
+def poi_detail(request, city_name, poi_id):
+    """Return JSON data for a specific POI."""
+    city = get_object_or_404(City, name=city_name)
+    poi = get_object_or_404(PointOfInterest, id=poi_id, city=city)
+    
+    data = {
+        'id': poi.id,
+        'name': poi.name,
+        'category': poi.category,
+        'sub_category': poi.sub_category,
+        'description': poi.description,
+        'latitude': poi.latitude,
+        'longitude': poi.longitude,
+        'address': poi.address,
+        'phone': poi.phone,
+        'website': poi.website,
+        'hours': poi.hours,
+        'rank': poi.rank,
+        'district': poi.district.name if poi.district else None
+    }
+    
+    return JsonResponse(data)
