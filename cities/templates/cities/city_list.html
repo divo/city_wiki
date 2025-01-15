@@ -2,6 +2,31 @@
 {% load city_tags %}
 
 {% block content %}
+<style>
+    .actions {
+        margin: 20px 0;
+        display: flex;
+        gap: 10px;
+    }
+
+    .action-btn {
+        display: inline-block;
+        padding: 10px 20px;
+        background: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        font-weight: bold;
+        transition: background-color 0.2s;
+    }
+
+    .action-btn:hover {
+        background: #0056b3;
+        color: white;
+        text-decoration: none;
+    }
+</style>
+
 <div class="container">
     <div class="import-section">
         <h2>Import City</h2>
@@ -23,6 +48,10 @@
                 </div>
             {% endfor %}
         {% endif %}
+    </div>
+
+    <div class="actions">
+        <a href="{% url 'generate_text_view' %}" class="action-btn">Generate Content</a>
     </div>
 
     <h1>Cities</h1>

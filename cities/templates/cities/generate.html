@@ -202,10 +202,92 @@
         font-size: 0.9em;
         color: #495057;
     }
+
+    .list-section {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .list-section h3 {
+        margin-top: 0;
+        color: #2c3e50;
+        font-size: 1.3em;
+        margin-bottom: 10px;
+    }
+
+    .sublist {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .sublist-description {
+        color: #666;
+        margin-bottom: 10px;
+        font-style: italic;
+    }
+
+    .poi-item {
+        margin-bottom: 10px;
+        padding: 10px;
+        background: white;
+        border-radius: 4px;
+    }
+
+    .poi-name {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .poi-reason {
+        color: #666;
+        margin-top: 5px;
+        font-size: 0.9em;
+    }
+
+    .type-select {
+        margin-bottom: 30px;
+        padding: 15px;
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .type-select select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 16px;
+        background: white;
+    }
+
+    .type-description {
+        margin-top: 10px;
+        color: #666;
+        font-style: italic;
+    }
 </style>
 
 <div class="generate-container">
-    <h1>Generate Text Analysis</h1>
+    <h1>Generate Content</h1>
+    
+    <div class="type-select">
+        <div class="form-group">
+            <label for="generationType">Generation Type:</label>
+            <select id="generationType" name="type">
+                <option value="analysis">City Analysis</option>
+                <option value="list">POI Lists</option>
+            </select>
+        </div>
+        <div class="type-description" id="typeDescription">
+            Generate a detailed analysis of the city's points of interest, including category distribution and district insights.
+        </div>
+    </div>
     
     <form id="generateForm">
         <div class="form-group">
@@ -218,48 +300,68 @@
             </select>
         </div>
         
+        <div class="form-group" id="countGroup" style="display: none;">
+            <label for="count">Number of POIs:</label>
+            <input type="number" id="count" name="count" min="1" value="5" class="form-control">
+            <small class="form-text text-muted">How many points of interest should be included in the list?</small>
+        </div>
+        
         <div class="form-group">
             <label for="prompt">Prompt:</label>
             <textarea id="prompt" name="prompt" required
-                      placeholder="Enter your prompt here. For example: 'Analyze the distribution of restaurants across different districts'"></textarea>
+                      placeholder="Enter your prompt here..."></textarea>
         </div>
         
-        <button type="submit" class="generate-btn" id="generateBtn">Generate Analysis</button>
+        <button type="submit" class="generate-btn" id="generateBtn">Generate</button>
     </form>
     
     <div class="loading" id="loading">Generating response</div>
     <div class="error-message" id="errorMessage"></div>
+    
     <div class="response-container" id="responseContainer">
-        <div class="analysis-section">
-            <h2>Summary</h2>
-            <p id="summary"></p>
+        <!-- Analysis View -->
+        <div id="analysisView" style="display: none;">
+            <div class="analysis-section">
+                <h2>Summary</h2>
+                <p id="summary"></p>
+            </div>
+
+            <div class="analysis-section">
+                <h2>Key Findings</h2>
+                <ul class="key-findings" id="keyFindings"></ul>
+            </div>
+
+            <div class="analysis-section">
+                <h2>Category Distribution</h2>
+                <p id="categoryDescription"></p>
+                <ul class="highlights" id="categoryHighlights"></ul>
+            </div>
+
+            <div class="analysis-section">
+                <h2>District Insights</h2>
+                <p id="districtDescription"></p>
+                <ul class="highlights" id="districtHighlights"></ul>
+            </div>
+
+            <div class="analysis-section">
+                <h2>Recommendations</h2>
+                <div class="recommendations" id="recommendations"></div>
+            </div>
         </div>
 
-        <div class="analysis-section">
-            <h2>Key Findings</h2>
-            <ul class="key-findings" id="keyFindings"></ul>
+        <!-- List View -->
+        <div id="listView" style="display: none;">
+            <div class="list-section">
+                <h2 id="listTitle"></h2>
+                <p id="listDescription"></p>
+                <div id="poiList"></div>
+            </div>
         </div>
 
-        <div class="analysis-section">
-            <h2>Category Distribution</h2>
-            <p id="categoryDescription"></p>
-            <ul class="highlights" id="categoryHighlights"></ul>
-        </div>
-
-        <div class="analysis-section">
-            <h2>District Insights</h2>
-            <p id="districtDescription"></p>
-            <ul class="highlights" id="districtHighlights"></ul>
-        </div>
-
-        <div class="analysis-section">
-            <h2>Recommendations</h2>
-            <div class="recommendations" id="recommendations"></div>
-        </div>
-
+        <!-- Common Validation Section -->
         <div class="analysis-section">
             <h2>Validation</h2>
-            <p>POIs referenced in analysis: <span id="mentionedPoisCount"></span> out of <span id="totalPoisCount"></span></p>
+            <p>POIs referenced: <span id="mentionedPoisCount"></span> out of <span id="totalPoisCount"></span></p>
             <div class="validation-details">
                 <h3>Referenced POIs:</h3>
                 <ul class="mentioned-pois" id="mentionedPois"></ul>
@@ -272,6 +374,23 @@
 </div>
 
 <script>
+const typeDescriptions = {
+    'analysis': 'Generate a detailed analysis of the city\'s points of interest, including category distribution and district insights.',
+    'list': 'Create a curated list of points of interest based on specific criteria.'
+};
+
+const promptPlaceholders = {
+    'analysis': 'Enter your prompt here. For example: "Analyze the distribution of restaurants across different districts"',
+    'list': 'Enter your prompt here. For example: "Find the most historically significant attractions" or "List the best family-friendly activities"'
+};
+
+document.getElementById('generationType').addEventListener('change', function(e) {
+    const type = e.target.value;
+    document.getElementById('typeDescription').textContent = typeDescriptions[type];
+    document.getElementById('prompt').placeholder = promptPlaceholders[type];
+    document.getElementById('countGroup').style.display = type === 'list' ? 'block' : 'none';
+});
+
 document.getElementById('generateForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -281,6 +400,8 @@ document.getElementById('generateForm').addEventListener('submit', async functio
     const loading = document.getElementById('loading');
     const errorMessage = document.getElementById('errorMessage');
     const responseContainer = document.getElementById('responseContainer');
+    const generationType = document.getElementById('generationType').value;
+    const count = document.getElementById('count').value;
     
     // Reset UI
     errorMessage.style.display = 'none';
@@ -289,71 +410,120 @@ document.getElementById('generateForm').addEventListener('submit', async functio
     loading.style.display = 'block';
     
     try {
-        const response = await fetch(`/city/${encodeURIComponent(citySelect.value)}/generate/`, {
+        const endpoint = generationType === 'list' ? 'generate-list' : 'generate';
+        const formData = new URLSearchParams();
+        formData.append('prompt', prompt);
+        if (generationType === 'list') {
+            formData.append('count', count);
+        }
+        
+        const response = await fetch(`/city/${encodeURIComponent(citySelect.value)}/${endpoint}/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `prompt=${encodeURIComponent(prompt)}`
+            body: formData
         });
         
         const data = await response.json();
         
         if (response.ok) {
-            // Display the structured response
-            const analysis = data.analysis;
+            // Hide both views initially
+            document.getElementById('analysisView').style.display = 'none';
+            document.getElementById('listView').style.display = 'none';
             
-            // Update summary
-            document.getElementById('summary').textContent = analysis.summary;
-            
-            // Update key findings
-            const keyFindingsList = document.getElementById('keyFindings');
-            keyFindingsList.innerHTML = analysis.key_findings
-                .map(finding => `<li>${finding}</li>`)
-                .join('');
-            
-            // Update category distribution
-            document.getElementById('categoryDescription').textContent = 
-                analysis.analysis.category_distribution.description;
-            document.getElementById('categoryHighlights').innerHTML = 
-                analysis.analysis.category_distribution.highlights
-                    .map(highlight => `<li>${highlight}</li>`)
-                    .join('');
-            
-            // Update district insights
-            document.getElementById('districtDescription').textContent = 
-                analysis.analysis.district_insights.description;
-            document.getElementById('districtHighlights').innerHTML = 
-                analysis.analysis.district_insights.highlights
-                    .map(highlight => `<li>${highlight}</li>`)
-                    .join('');
-            
-            // Update recommendations
-            document.getElementById('recommendations').innerHTML = 
-                analysis.analysis.recommendations
-                    .map(rec => `
-                        <div class="recommendation-item">
-                            <div class="recommendation-title">${rec.title}</div>
-                            <div>${rec.description}</div>
+            if (generationType === 'list') {
+                // Display the list response
+                const listData = data.list;
+                
+                // Update title and description
+                document.getElementById('listTitle').textContent = listData.title;
+                document.getElementById('listDescription').textContent = listData.description;
+                
+                // Update POI list
+                const poiListContainer = document.getElementById('poiList');
+                poiListContainer.innerHTML = listData.pois
+                    .map(poi => `
+                        <div class="poi-item">
+                            <div class="poi-name">${poi.name}</div>
+                            <div class="poi-reason">${poi.reason}</div>
                         </div>
                     `)
                     .join('');
-            
-            // Update validation information
-            document.getElementById('mentionedPoisCount').textContent = analysis._validation.mentioned_pois;
-            document.getElementById('totalPoisCount').textContent = analysis._validation.total_pois;
-            document.getElementById('mentionedPois').innerHTML = 
-                analysis._validation.mentioned_poi_names
-                    .map(poi => `<li>${poi}</li>`)
+                
+                // Show list view
+                document.getElementById('listView').style.display = 'block';
+                
+                // Update validation information
+                document.getElementById('mentionedPoisCount').textContent = listData._validation.mentioned_pois;
+                document.getElementById('totalPoisCount').textContent = listData._validation.total_pois;
+                document.getElementById('mentionedPois').innerHTML = 
+                    listData._validation.mentioned_poi_names
+                        .map(poi => `<li>${poi}</li>`)
+                        .join('');
+                
+                // Update raw JSON
+                document.getElementById('rawJson').textContent = 
+                    JSON.stringify(listData, null, 2);
+            } else {
+                // Display the analysis response
+                const analysis = data.analysis;
+                
+                // Update summary
+                document.getElementById('summary').textContent = analysis.summary;
+                
+                // Update key findings
+                const keyFindingsList = document.getElementById('keyFindings');
+                keyFindingsList.innerHTML = analysis.key_findings
+                    .map(finding => `<li>${finding}</li>`)
                     .join('');
-            
-            // Update raw JSON
-            document.getElementById('rawJson').textContent = 
-                JSON.stringify(analysis, null, 2);
+                
+                // Update category distribution
+                document.getElementById('categoryDescription').textContent = 
+                    analysis.analysis.category_distribution.description;
+                document.getElementById('categoryHighlights').innerHTML = 
+                    analysis.analysis.category_distribution.highlights
+                        .map(highlight => `<li>${highlight}</li>`)
+                        .join('');
+                
+                // Update district insights
+                document.getElementById('districtDescription').textContent = 
+                    analysis.analysis.district_insights.description;
+                document.getElementById('districtHighlights').innerHTML = 
+                    analysis.analysis.district_insights.highlights
+                        .map(highlight => `<li>${highlight}</li>`)
+                        .join('');
+                
+                // Update recommendations
+                document.getElementById('recommendations').innerHTML = 
+                    analysis.analysis.recommendations
+                        .map(rec => `
+                            <div class="recommendation-item">
+                                <div class="recommendation-title">${rec.title}</div>
+                                <div>${rec.description}</div>
+                            </div>
+                        `)
+                        .join('');
+                
+                // Show analysis view
+                document.getElementById('analysisView').style.display = 'block';
+                
+                // Update validation information
+                document.getElementById('mentionedPoisCount').textContent = analysis._validation.mentioned_pois;
+                document.getElementById('totalPoisCount').textContent = analysis._validation.total_pois;
+                document.getElementById('mentionedPois').innerHTML = 
+                    analysis._validation.mentioned_poi_names
+                        .map(poi => `<li>${poi}</li>`)
+                        .join('');
+                
+                // Update raw JSON
+                document.getElementById('rawJson').textContent = 
+                    JSON.stringify(analysis, null, 2);
+            }
             
             responseContainer.style.display = 'block';
         } else {
-            throw new Error(data.message || 'Failed to generate text');
+            throw new Error(data.message || 'Failed to generate content');
         }
     } catch (error) {
         errorMessage.textContent = error.message;
