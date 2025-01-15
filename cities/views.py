@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from data_processing.wikivoyage_scraper import WikivoyageScraper
 from .models import PointOfInterest, City, District, PoiList
 from django.db import transaction, models
-from .tasks import import_city_data
+from .fetch_tasks import import_city_data
 from celery.result import AsyncResult
 from django.contrib import messages
 import logging
