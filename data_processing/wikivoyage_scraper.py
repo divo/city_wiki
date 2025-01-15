@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 import logging
 import mwapi  # MediaWiki API wrapper
+from bs4 import BeautifulSoup, Comment
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +119,17 @@ class WikivoyageScraper:
                 if template.string not in subsection_templates
                 and template.name.lower().strip() in ['listing', 'see', 'do', 'buy', 'eat', 'drink', 'sleep']]
     
+    def _clean_text(self, text: str) -> str:
+        """Remove all HTML tags, comments and clean up whitespace from text."""
+        if not text:
+            return ""
+        
+        # Use BeautifulSoup to strip all HTML
+        soup = BeautifulSoup(text, 'html.parser')
+        
+        # Get text content and clean up whitespace
+        return ' '.join(soup.get_text().split())
+
     def _parse_listing_template(self, template: wtp.Template, category: str, rank: int, section_title: str) -> Optional[PointOfInterest]:
         # Extract arguments from template
         args = {arg.name.strip().lower(): arg.value.strip() 
@@ -147,11 +159,12 @@ class WikivoyageScraper:
             except ValueError:
                 pass
         
-        # Build description from alt and content fields
-        description = args.get('alt', '')
+        # Build description from alt and content fields, cleaning HTML comments
+        description = self._clean_text(args.get('alt', ''))
         if 'content' in args:
-            description = f"{description} {args['content']}" if description else args['content']
-        
+            content = self._clean_text(args['content'])
+            description = f"{description} {content}" if description else content
+
         return PointOfInterest(
             name=name,  # Use the cleaned name
             category=category,
