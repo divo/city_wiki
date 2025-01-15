@@ -457,3 +457,85 @@ def poi_detail(request, city_name, poi_id):
     }
     
     return JsonResponse(data)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def poi_merge(request, city_name):
+    """Handle merging of two POIs."""
+    try:
+        # Parse the request data
+        data = json.loads(request.body)
+        keep_id = data.get('keep_id')
+        remove_id = data.get('remove_id')
+        field_selections = data.get('field_selections', {})
+        
+        # Get the POIs
+        city = get_object_or_404(City, name=city_name)
+        keep_poi = get_object_or_404(PointOfInterest, id=keep_id, city=city)
+        remove_poi = get_object_or_404(PointOfInterest, id=remove_id, city=city)
+        
+        # Store old values for change tracking
+        old_values = {
+            'name': keep_poi.name,
+            'category': keep_poi.category,
+            'sub_category': keep_poi.sub_category,
+            'description': keep_poi.description,
+            'latitude': keep_poi.latitude,
+            'longitude': keep_poi.longitude,
+            'address': keep_poi.address,
+            'phone': keep_poi.phone,
+            'website': keep_poi.website,
+            'hours': keep_poi.hours,
+            'rank': keep_poi.rank,
+            'district': keep_poi.district.name if keep_poi.district else None
+        }
+        
+        # Create a new revision for the merge
+        with reversion.create_revision():
+            # Update fields based on selections
+            for field, value in field_selections.items():
+                if field == 'coordinates':
+                    if value:
+                        lat, lon = value.split(',')
+                        keep_poi.latitude = float(lat.strip())
+                        keep_poi.longitude = float(lon.strip())
+                elif field == 'district':
+                    if value == 'Main City':
+                        keep_poi.district = None
+                    else:
+                        # Try to find the district by name
+                        try:
+                            district = District.objects.get(name=value, city=city)
+                            keep_poi.district = district
+                        except District.DoesNotExist:
+                            # If district doesn't exist, create it
+                            district = District.objects.create(name=value, city=city)
+                            keep_poi.district = district
+                else:
+                    setattr(keep_poi, field, value)
+            
+            keep_poi.save()
+            
+            # Store meta-data including the changes
+            changes = {field: {'old': old_values[field], 'new': value} 
+                      for field, value in field_selections.items() 
+                      if old_values.get(field) != value}
+            
+            reversion.set_comment(json.dumps({
+                'message': f"Merged with POI {remove_id}",
+                'changes': changes
+            }))
+            
+            # Delete the removed POI
+            remove_poi.delete()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'POIs merged successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
