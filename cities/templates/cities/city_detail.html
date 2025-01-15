@@ -95,6 +95,7 @@
         <h1>{{ city.name }}</h1>
         <div class="mb-4">
             <a href="{% url 'city_map' city.name %}" class="btn btn-primary">View Map</a>
+            <a href="{% url 'poi_lists' city.name %}" class="btn btn-primary">View Lists</a>
         </div>
     </div>
 

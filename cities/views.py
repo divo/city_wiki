@@ -539,3 +539,13 @@ def poi_merge(request, city_name):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+def poi_lists(request, city_name):
+    """Display all POI lists for a city."""
+    city = get_object_or_404(City, name=city_name)
+    poi_lists = city.poi_lists.all()
+    
+    return render(request, 'cities/poi_lists.html', {
+        'city': city,
+        'poi_lists': poi_lists,
+    })

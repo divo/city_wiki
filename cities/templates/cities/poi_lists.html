@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .list-container {
+        margin-top: 2em;
+    }
+    .poi-list {
+        background: #f8f9fa;
+        padding: 1em;
+        margin-bottom: 1em;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    .poi-list h3 {
+        margin-top: 0;
+    }
+    .poi-list ul {
+        list-style: none;
+        padding-left: 0;
+    }
+    .poi-list li {
+        padding: 0.5em 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .poi-list li:last-child {
+        border-bottom: none;
+    }
+    .list-meta {
+        color: #6c757d;
+        font-size: 0.9em;
+        margin-top: 0.5em;
+    }
+</style>
+
+<div class="container">
+    <h2>Generated Lists for {{ city.name }}</h2>
+    
+    <div class="list-container">
+        {% if poi_lists %}
+            {% for list in poi_lists %}
+                <div class="poi-list">
+                    <h3>{{ list.title }}</h3>
+                    <ul>
+                        {% for poi in list.pois.all %}
+                            <li>{{ poi.name }} {% if poi.district %}({{ poi.district }}){% endif %}</li>
+                        {% endfor %}
+                    </ul>
+                    <div class="list-meta">
+                        Created: {{ list.created_at|date:"F j, Y" }}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No lists have been generated yet.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 
