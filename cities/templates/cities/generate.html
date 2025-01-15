@@ -377,6 +377,29 @@
     .btn-success:hover {
         background-color: #218838;
     }
+
+    .predefined-queries {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: white;
+        border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .predefined-queries select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 16px;
+        background: white;
+    }
+
+    .predefined-queries label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: bold;
+    }
 </style>
 
 <div class="generate-container">
@@ -392,6 +415,31 @@
         </div>
         <div class="type-description" id="typeDescription">
             Generate a detailed analysis of the city's points of interest, including category distribution and district insights.
+        </div>
+    </div>
+    
+    <div id="predefinedQueriesSection" class="predefined-queries" style="display: none;">
+        <div class="form-group">
+            <label for="predefinedQuery">Quick Lists:</label>
+            <select id="predefinedQuery">
+                <option value="">-- Select a predefined query --</option>
+                <option value="highlights">Highlights</option>
+                <option value="must see attractions">Must See Attractions</option>
+                <option value="museums">Museums</option>
+                <option value="top experiences">Top Experiences</option>
+                <option value="free things">Free Things</option>
+                <option value="scenic views">Scenic Views</option>
+                <option value="local hangouts">Local Hangouts</option>
+                <option value="movie locations">Movie Locations</option>
+                <option value="architecture">Architecture</option>
+                <option value="parks">Parks</option>
+                <option value="walks">Walks</option>
+                <option value="markets">Markets</option>
+                <option value="churches">Churches</option>
+                <option value="literature attractions">Literature Attractions</option>
+                <option value="art attractions">Art Attractions</option>
+                <option value="historic sights">Historic Sights</option>
+            </select>
         </div>
     </div>
     
@@ -523,6 +571,39 @@ document.getElementById('generationType').addEventListener('change', function(e)
     document.getElementById('typeDescription').textContent = typeDescriptions[type];
     document.getElementById('prompt').placeholder = promptPlaceholders[type];
     document.getElementById('countGroup').style.display = type === 'list' ? 'block' : 'none';
+    document.getElementById('predefinedQueriesSection').style.display = type === 'list' ? 'block' : 'none';
+});
+
+document.getElementById('predefinedQuery').addEventListener('change', function(e) {
+    const selectedQuery = e.target.value;
+    if (selectedQuery) {
+        const count = document.getElementById('count').value;
+        const city = document.getElementById('citySelect').value;
+        const prompt = `List the top ${count} ${selectedQuery} in ${city}`;
+        document.getElementById('prompt').value = prompt;
+    }
+});
+
+document.getElementById('count').addEventListener('change', function(e) {
+    const predefinedQuery = document.getElementById('predefinedQuery');
+    if (predefinedQuery.value) {
+        const selectedQuery = predefinedQuery.value;
+        const count = e.target.value;
+        const city = document.getElementById('citySelect').value;
+        const prompt = `List the top ${count} ${selectedQuery} in ${city}`;
+        document.getElementById('prompt').value = prompt;
+    }
+});
+
+document.getElementById('citySelect').addEventListener('change', function(e) {
+    const predefinedQuery = document.getElementById('predefinedQuery');
+    if (predefinedQuery.value) {
+        const selectedQuery = predefinedQuery.value;
+        const count = document.getElementById('count').value;
+        const city = e.target.value;
+        const prompt = `List the top ${count} ${selectedQuery} in ${city}`;
+        document.getElementById('prompt').value = prompt;
+    }
 });
 
 document.getElementById('generateForm').addEventListener('submit', async function(e) {
