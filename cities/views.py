@@ -16,8 +16,17 @@ from django.core.serializers.json import DjangoJSONEncoder
 from . import generation
 import reversion
 from reversion.models import Version
+from . import enrich_tasks
 
 logger = logging.getLogger(__name__)
+
+# Define available enrichment tasks
+ENRICHMENT_TASKS = [
+    ('normalize_categories', 'Normalize Categories'),
+    ('geocode_addresses', 'Geocode Missing Addresses'),
+    ('dedup_main_city', 'Find Duplicates in Main City'),
+    # Add more tasks here as they're implemented
+]
 
 def city_list(request):
     cities = City.objects.all()
@@ -144,6 +153,7 @@ def city_detail(request, city_name):
         'sort_dir': sort_dir,
         'districts': districts,
         'selected_district': district_id,
+        'enrichment_tasks': ENRICHMENT_TASKS,
     })
 
 @csrf_exempt  # TODO: Replace with proper admin authentication
@@ -609,6 +619,66 @@ def delete_poi_list(request, city_name, list_id):
         })
         
     except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def execute_task(request, city_name, task_id):
+    """Execute an enrichment task."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+        
+        # Get the task function
+        task_func = getattr(enrich_tasks, task_id, None)
+        if not task_func:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Unknown task: {task_id}'
+            }, status=400)
+        
+        # Start the task
+        task = task_func.delay(city.id)
+        
+        return JsonResponse({
+            'status': 'success',
+            'task_id': task.id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error executing task {task_id} for {city_name}: {str(e)}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@require_http_methods(["GET"])
+def check_task_status(request, task_id):
+    """Check the status of a task."""
+    try:
+        task_result = AsyncResult(task_id)
+        
+        if task_result.ready():
+            if task_result.successful():
+                result = task_result.get()
+                return JsonResponse({
+                    'status': 'completed',
+                    'result': result
+                })
+            else:
+                return JsonResponse({
+                    'status': 'failed',
+                    'error': str(task_result.result)
+                }, status=500)
+        
+        return JsonResponse({
+            'status': 'processing'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error checking task status for {task_id}: {str(e)}")
         return JsonResponse({
             'status': 'error',
             'message': str(e)
