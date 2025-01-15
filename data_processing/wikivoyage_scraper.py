@@ -119,12 +119,27 @@ class WikivoyageScraper:
                 if template.string not in subsection_templates
                 and template.name.lower().strip() in ['listing', 'see', 'do', 'buy', 'eat', 'drink', 'sleep']]
     
+    def _clean_wiki_links(self, text: str) -> str:
+        """Extract the display text from wiki-style links [[link|text]] or [[text]]."""
+        result = text
+        while '[[' in result and ']]' in result:
+            start = result.find('[[')
+            end = result.find(']]') + 2
+            link_text = result[start+2:end-2]
+            # Take text after pipe or full link if no pipe
+            display_text = link_text.split('|')[-1]
+            result = result[:start] + display_text + result[end:]
+        return result
+
     def _clean_text(self, text: str) -> str:
-        """Remove all HTML tags, comments and clean up whitespace from text."""
+        """Remove HTML tags, comments, wiki links and clean up whitespace from text."""
         if not text:
             return ""
         
-        # Use BeautifulSoup to strip all HTML
+        # First clean wiki links
+        text = self._clean_wiki_links(text)
+        
+        # Then use BeautifulSoup to strip all HTML
         soup = BeautifulSoup(text, 'html.parser')
         
         # Get text content and clean up whitespace
@@ -139,15 +154,8 @@ class WikivoyageScraper:
         if 'name' not in args:
             return None
         
-        # Handle markdown-style links in name field
-        # TODO: Might want to store the link so I can parse it later
-        name = args['name']
-        if '[[' in name and ']]' in name:
-            # Extract text between [[ and ]]
-            name = name.split('[[')[-1].split(']]')[0]
-            # If there's a pipe character, take the text after it
-            if '|' in name:
-                name = name.split('|')[1]
+        # Handle markdown-style links in name field using the helper method
+        name = self._clean_wiki_links(args['name'])
 
         # Parse coordinates if present
         coords = None
