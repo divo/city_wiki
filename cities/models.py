@@ -57,6 +57,7 @@ class PointOfInterest(models.Model):
     website = models.URLField(max_length=500, null=True, blank=True)
     hours = models.CharField(max_length=500, null=True, blank=True)
     rank = models.IntegerField(default=0)
+    image_url = models.URLField(max_length=500, null=True, blank=True, help_text="URL to an image of this POI")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
