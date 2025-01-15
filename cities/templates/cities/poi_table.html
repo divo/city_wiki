@@ -63,6 +63,27 @@
         .empty-cell {
             background-color: #ffebee;
         }
+
+        /* Search input styles */
+        .column-search {
+            width: 100%;
+            padding: 4px 8px;
+            margin: 4px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .column-search:focus {
+            outline: none;
+            border-color: #17a2b8;
+            box-shadow: 0 0 0 2px rgba(23, 162, 184, 0.25);
+        }
+
+        /* Hide rows that don't match search */
+        tr.hidden {
+            display: none;
+        }
     </style>
 
     <div class="table-responsive">
@@ -73,52 +94,65 @@
                         <a href="?sort=name&dir={% if sort_by == 'name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Name {% if sort_by == 'name' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="0" placeholder="Search names...">
                     </th>
                     <th>
                         <a href="?sort=rank&dir={% if sort_by == 'rank' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Rank {% if sort_by == 'rank' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="1" placeholder="Search rank...">
                     </th>
                     <th>
                         <a href="?sort=sub_category&dir={% if sort_by == 'sub_category' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Sub-category {% if sort_by == 'sub_category' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="2" placeholder="Search sub-categories...">
                     </th>
                     <th>
                         <a href="?sort=district&dir={% if sort_by == 'district' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             District {% if sort_by == 'district' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="3" placeholder="Search districts...">
                     </th>
                     <th>
                         <a href="?sort=description&dir={% if sort_by == 'description' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Description {% if sort_by == 'description' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="4" placeholder="Search descriptions...">
                     </th>
-                    <th>Coords</th>
+                    <th>
+                        Coords
+                        <input type="text" class="column-search" data-column="5" placeholder="Search coordinates...">
+                    </th>
                     <th>
                         <a href="?sort=address&dir={% if sort_by == 'address' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Address {% if sort_by == 'address' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="6" placeholder="Search addresses...">
                     </th>
                     <th>
                         <a href="?sort=phone&dir={% if sort_by == 'phone' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Contact {% if sort_by == 'phone' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="7" placeholder="Search contacts...">
                     </th>
                     <th>
                         <a href="?sort=hours&dir={% if sort_by == 'hours' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Hours {% if sort_by == 'hours' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="8" placeholder="Search hours...">
                     </th>
                     <th>
                         <a href="?sort=website&dir={% if sort_by == 'website' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Website {% if sort_by == 'website' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="9" placeholder="Search websites...">
                     </th>
                     <th>
                         <a href="?sort=created_at&dir={% if sort_by == 'created_at' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Created at {% if sort_by == 'created_at' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
+                        <input type="text" class="column-search" data-column="10" placeholder="Search dates...">
                     </th>
                     <th>Actions</th>
                 </tr>
@@ -169,6 +203,66 @@
             </tbody>
         </table>
     </div>
+
+    <script>
+        // Fuzzy search function
+        function fuzzyMatch(pattern, str) {
+            pattern = pattern.toLowerCase();
+            str = str.toLowerCase();
+            
+            let patternIdx = 0;
+            let strIdx = 0;
+            
+            while (patternIdx < pattern.length && strIdx < str.length) {
+                if (pattern[patternIdx] === str[strIdx]) {
+                    patternIdx++;
+                }
+                strIdx++;
+            }
+            
+            return patternIdx === pattern.length;
+        }
+
+        // Function to handle search
+        function handleSearch(event) {
+            const searchInput = event.target;
+            const searchValue = searchInput.value.trim();
+            const columnIndex = parseInt(searchInput.dataset.column);
+            const tbody = searchInput.closest('table').querySelector('tbody');
+            const rows = tbody.querySelectorAll('tr');
+            
+            // Get all active searches
+            const activeSearches = {};
+            document.querySelectorAll('.column-search').forEach(input => {
+                const value = input.value.trim();
+                if (value) {
+                    activeSearches[input.dataset.column] = value;
+                }
+            });
+            
+            // Check each row against all active searches
+            rows.forEach(row => {
+                let showRow = true;
+                
+                for (const [colIndex, searchValue] of Object.entries(activeSearches)) {
+                    const cell = row.children[colIndex];
+                    const cellText = cell.textContent.trim();
+                    
+                    if (!fuzzyMatch(searchValue, cellText)) {
+                        showRow = false;
+                        break;
+                    }
+                }
+                
+                row.classList.toggle('hidden', !showRow);
+            });
+        }
+
+        // Add event listeners to all search inputs
+        document.querySelectorAll('.column-search').forEach(input => {
+            input.addEventListener('input', handleSearch);
+        });
+    </script>
 {% else %}
     <p>No points of interest in this category.</p>
 {% endif %} 
