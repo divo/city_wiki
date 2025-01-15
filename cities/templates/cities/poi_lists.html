@@ -14,6 +14,9 @@
     }
     .poi-list h3 {
         margin-top: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
     .poi-list ul {
         list-style: none;
@@ -31,6 +34,18 @@
         font-size: 0.9em;
         margin-top: 0.5em;
     }
+    .delete-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9em;
+    }
+    .delete-btn:hover {
+        background: #c82333;
+    }
 </style>
 
 <div class="container">
@@ -40,7 +55,10 @@
         {% if poi_lists %}
             {% for list in poi_lists %}
                 <div class="poi-list">
-                    <h3>{{ list.title }}</h3>
+                    <h3>
+                        <span>{{ list.title }}</span>
+                        <button onclick="deleteList({{ list.id }}, '{{ list.title|escapejs }}')" class="delete-btn">Delete</button>
+                    </h3>
                     <ul>
                         {% for poi in list.pois.all %}
                             <li>{{ poi.name }} {% if poi.district %}({{ poi.district }}){% endif %}</li>
@@ -56,4 +74,28 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+function deleteList(listId, listTitle) {
+    if (confirm(`Are you sure you want to delete the list "${listTitle}"?`)) {
+        fetch(`/city/{{ city.name }}/lists/${listId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                window.location.reload();
+            } else {
+                alert('Error deleting list: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error deleting list: ' + error);
+        });
+    }
+}
+</script>
 {% endblock %} 

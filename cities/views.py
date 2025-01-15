@@ -593,3 +593,23 @@ def create_poi_list(request, city_name):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def delete_poi_list(request, city_name, list_id):
+    """Delete a POI list."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+        poi_list = get_object_or_404(PoiList, id=list_id, city=city)
+        poi_list.delete()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'List deleted successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
