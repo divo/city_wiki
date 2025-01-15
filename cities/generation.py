@@ -168,10 +168,13 @@ def generate_list(request, city_name):
             # Get POIs with coordinates
             pois = city.points_of_interest.filter(
                 latitude__isnull=False, 
-                longitude__isnull=False
+                longitude__isnull=False,
+                # Ensure both coordinates are non-zero
+                latitude__gt=0,
+                longitude__gt=0
             ).select_related('district')
             
-            f.write(f"Found {len(pois)} POIs for {city_name}\n")
+            f.write(f"Found {len(pois)} POIs with valid coordinates for {city_name}\n")
             
             # Get count parameter, default to 5 if not provided
             try:
@@ -181,21 +184,18 @@ def generate_list(request, city_name):
             except ValueError:
                 count = 5
             
-            # Prepare POI data - just names grouped by category and district
+            # Prepare POI data - include IDs in the structure
             poi_data = {}
-            all_poi_names = set()  # Track all POI names for validation
-            poi_lookup = {}  # Map POI names to their full objects
+            poi_lookup = {}  # Map POI IDs to their full objects
             for poi in pois:
+                # Skip POIs with invalid coordinates
+                if not poi.latitude or not poi.longitude:
+                    continue
+                    
                 # Ensure all text fields are properly encoded
                 category = str(poi.category or '').encode('utf-8').decode('utf-8')
                 district = str(poi.district.name if poi.district else 'Main City').encode('utf-8').decode('utf-8')
                 name = str(poi.name or '').encode('utf-8').decode('utf-8')
-                sub_category = str(poi.sub_category or '').encode('utf-8').decode('utf-8')
-                description = str(poi.description or '').encode('utf-8').decode('utf-8')
-                address = str(poi.address or '').encode('utf-8').decode('utf-8')
-                phone = str(poi.phone or '').encode('utf-8').decode('utf-8')
-                website = str(poi.website or '').encode('utf-8').decode('utf-8')
-                hours = str(poi.hours or '').encode('utf-8').decode('utf-8')
                 
                 if category not in poi_data:
                     poi_data[category] = {}
@@ -203,25 +203,36 @@ def generate_list(request, city_name):
                 if district not in poi_data[category]:
                     poi_data[category][district] = []
                     
-                poi_data[category][district].append(name)
-                all_poi_names.add(name)
-                poi_lookup[name] = {
+                # Include both ID and name in the data structure
+                poi_data[category][district].append({
+                    "id": poi.id,
+                    "name": name
+                })
+                
+                # Store full POI details in lookup
+                poi_lookup[poi.id] = {
                     'id': poi.id,
                     'name': name,
                     'category': category,
-                    'sub_category': sub_category,
-                    'description': description,
+                    'sub_category': str(poi.sub_category or '').encode('utf-8').decode('utf-8'),
+                    'description': str(poi.description or '').encode('utf-8').decode('utf-8'),
                     'latitude': poi.latitude,
                     'longitude': poi.longitude,
-                    'address': address,
-                    'phone': phone,
-                    'website': website,
-                    'hours': hours,
+                    'address': str(poi.address or '').encode('utf-8').decode('utf-8'),
+                    'phone': str(poi.phone or '').encode('utf-8').decode('utf-8'),
+                    'website': str(poi.website or '').encode('utf-8').decode('utf-8'),
+                    'hours': str(poi.hours or '').encode('utf-8').decode('utf-8'),
                     'rank': poi.rank,
                     'district': district
                 }
             
-            f.write(f"Processed POI data with {len(all_poi_names)} unique POIs\n")
+            if not poi_lookup:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'No POIs with valid coordinates found for {city_name}'
+                }, status=400)
+            
+            f.write(f"Processed {len(poi_lookup)} POIs with valid coordinates\n")
             
             # Initialize OpenAI client
             try:
@@ -249,7 +260,8 @@ def generate_list(request, city_name):
             system_message = f"""You are an AI assistant helping to create a curated list of points of interest in {city.name}.
 The city has {len(pois)} points of interest with valid coordinates, organized by category and district.
 
-CRITICAL: When mentioning specific locations, you MUST ONLY use the exact names of POIs provided in the data. Do not make up or reference any locations that aren't in the provided dataset.
+CRITICAL: You MUST use the exact POI IDs provided in the data. Each POI in the data has an "id" field - you must use these IDs in your response.
+DO NOT try to reference POIs by name alone, you must use their IDs.
 
 Your task is to create a single themed list with EXACTLY {count} points of interest based on the user's prompt.
 
@@ -259,7 +271,7 @@ IMPORTANT: You must respond with valid JSON only. Your response should follow th
     "description": "A brief explanation of the list's theme or purpose",
     "pois": [
         {{
-            "name": "Exact POI name from the dataset",
+            "id": "The exact POI ID from the dataset",
             "reason": "Brief explanation of why this POI is included"
         }},
         // EXACTLY {count} POIs must be included, no more, no less
@@ -267,10 +279,10 @@ IMPORTANT: You must respond with valid JSON only. Your response should follow th
 }}
 
 Remember: 
-1. All POIs mentioned must be from this exact list: {sorted(list(all_poi_names))}
-2. All POIs mentioned must be written exactly the same as in the dataset. Do not use abbreviations or other variations. These are used as keys.
+1. You MUST use the exact POI IDs from the dataset in your response
 2. You MUST include EXACTLY {count} POIs in your response, no more, no less
-3. Do not create multiple sublists - just one single list with {count} items"""
+3. Do not create multiple sublists - just one single list with {count} items
+4. The POI data is structured as: category -> district -> list of POIs with IDs and names"""
 
             f.write("Making OpenAI API call...\n")
             
@@ -315,18 +327,23 @@ Remember:
                 missing_pois = []
                 valid_pois = []
                 for poi in list_data['pois']:
-                    if poi['name'] in poi_lookup:
-                        poi['details'] = poi_lookup[poi['name']]
-                        valid_pois.append(poi)
+                    poi_id = int(poi['id']) if isinstance(poi['id'], str) else poi['id']
+                    if poi_id in poi_lookup:
+                        poi_details = poi_lookup[poi_id]
+                        valid_pois.append({
+                            'name': poi_details['name'],
+                            'reason': poi['reason'],
+                            'details': poi_details
+                        })
                     else:
-                        missing_pois.append(poi['name'])
+                        missing_pois.append(f"ID: {poi['id']}")
                 
                 # Replace the POIs list with only valid POIs
                 list_data['pois'] = valid_pois
                 
                 # Add validation info to the response
                 list_data['_validation'] = {
-                    'total_pois': len(all_poi_names),
+                    'total_pois': len(poi_lookup),
                     'mentioned_pois': len(valid_pois),
                     'mentioned_poi_names': sorted(poi['name'] for poi in valid_pois),
                     'missing_pois': missing_pois
