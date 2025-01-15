@@ -325,29 +325,28 @@ def poi_history(request, city_name, poi_id):
     
     # Process versions to show changes
     processed_versions = []
-    previous_data = None
     
     for version in versions:
-        current_data = version.field_dict
-        
-        if previous_data:
-            # Compare with previous version to show changes
-            changes = {}
-            for field, value in current_data.items():
-                if field in previous_data and previous_data[field] != value:
-                    changes[field] = {
-                        'old': previous_data[field],
-                        'new': value
-                    }
-            version.field_dict = changes
-        else:
-            # First version - show all fields as new
-            changes = {field: {'old': None, 'new': value} 
-                      for field, value in current_data.items()}
-            version.field_dict = changes
+        try:
+            # Try to parse the comment as JSON to get the changes
+            comment_data = json.loads(version.revision.comment or '{}')
+            changes = comment_data.get('changes', {})
             
-        processed_versions.append(version)
-        previous_data = current_data
+            # If no changes found in comment, fall back to comparing with previous version
+            if not changes:
+                current_data = version.field_dict
+                # For initial version, show all fields as new
+                changes = {field: {'old': None, 'new': value} 
+                          for field, value in current_data.items()}
+            
+            version.changes = changes
+            processed_versions.append(version)
+            
+        except json.JSONDecodeError:
+            # If comment is not JSON, show raw field dict
+            version.changes = {field: {'old': None, 'new': value} 
+                             for field, value in version.field_dict.items()}
+            processed_versions.append(version)
     
     return render(request, 'cities/poi_history.html', {
         'poi': poi,
@@ -368,3 +367,69 @@ def poi_revert(request, city_name, poi_id, revision_id):
     
     messages.success(request, f"Successfully reverted {poi.name} to version from {revision.date_created}")
     return redirect('poi_history', city_name=city_name, poi_id=poi_id)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def poi_edit(request, city_name, poi_id):
+    """Handle editing of a POI."""
+    try:
+        poi = get_object_or_404(PointOfInterest, id=poi_id, city__name=city_name)
+        
+        # Store old values for change tracking
+        old_values = {
+            'name': poi.name,
+            'category': poi.category,
+            'sub_category': poi.sub_category,
+            'description': poi.description,
+            'latitude': poi.latitude,
+            'longitude': poi.longitude,
+            'address': poi.address,
+            'phone': poi.phone,
+            'website': poi.website,
+            'hours': poi.hours,
+            'rank': poi.rank
+        }
+        
+        # Get new values from POST data
+        new_values = {
+            'name': request.POST.get('name'),
+            'category': request.POST.get('category'),
+            'sub_category': request.POST.get('sub_category'),
+            'description': request.POST.get('description'),
+            'latitude': request.POST.get('latitude') or None,
+            'longitude': request.POST.get('longitude') or None,
+            'address': request.POST.get('address'),
+            'phone': request.POST.get('phone'),
+            'website': request.POST.get('website'),
+            'hours': request.POST.get('hours'),
+            'rank': request.POST.get('rank')
+        }
+        
+        # Create a new revision
+        with reversion.create_revision():
+            # Update fields
+            for field, value in new_values.items():
+                setattr(poi, field, value)
+            
+            poi.save()
+            
+            # Store meta-data including the changes
+            changes = {field: {'old': old_values[field], 'new': new_values[field]} 
+                      for field, value in new_values.items() 
+                      if old_values[field] != new_values[field]}
+            
+            reversion.set_comment(json.dumps({
+                'message': "Updated via edit form",
+                'changes': changes
+            }))
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'POI updated successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)

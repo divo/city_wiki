@@ -84,6 +84,83 @@
         tr.hidden {
             display: none;
         }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 800px;
+            border-radius: 5px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: black;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-actions {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+
+        .btn-secondary {
+            color: #fff;
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
     </style>
 
     <div class="table-responsive">
@@ -197,11 +274,96 @@
                         <td {% if not poi.created_at %}class="empty-cell"{% endif %}>{{ poi.created_at|default:"" }}</td>
                         <td>
                             <a href="{% url 'poi_history' city.name poi.id %}" class="btn btn-sm btn-info">History</a>
+                            <button onclick="openEditModal({{ poi.id }}, '{{ poi.name|escapejs }}', '{{ poi.category }}', '{{ poi.sub_category|escapejs }}', '{{ poi.description|escapejs }}', '{{ poi.latitude|default:'' }}', '{{ poi.longitude|default:'' }}', '{{ poi.address|escapejs|default:'' }}', '{{ poi.phone|escapejs|default:'' }}', '{{ poi.website|escapejs|default:'' }}', '{{ poi.hours|escapejs|default:'' }}', {{ poi.rank|default:0 }})" class="btn btn-sm btn-primary">Edit</button>
                         </td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Point of Interest</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editForm" method="POST">
+                    {% csrf_token %}
+                    <input type="hidden" id="poiId" name="poi_id">
+                    
+                    <div class="form-group">
+                        <label for="name">Name:</label>
+                        <input type="text" id="name" name="name" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="category">Category:</label>
+                        <select id="category" name="category" class="form-control" required>
+                            <option value="see">See</option>
+                            <option value="eat">Eat</option>
+                            <option value="sleep">Sleep</option>
+                            <option value="shop">Shop</option>
+                            <option value="drink">Drink</option>
+                            <option value="play">Play</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sub_category">Sub-category:</label>
+                        <input type="text" id="sub_category" name="sub_category" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Description:</label>
+                        <textarea id="description" name="description" class="form-control" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="latitude">Latitude:</label>
+                            <input type="number" id="latitude" name="latitude" class="form-control" step="any">
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="longitude">Longitude:</label>
+                            <input type="number" id="longitude" name="longitude" class="form-control" step="any">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="address">Address:</label>
+                        <input type="text" id="address" name="address" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone">Phone:</label>
+                        <input type="text" id="phone" name="phone" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="website">Website:</label>
+                        <input type="url" id="website" name="website" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="hours">Hours:</label>
+                        <input type="text" id="hours" name="hours" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="rank">Rank:</label>
+                        <input type="number" id="rank" name="rank" class="form-control" min="1" max="5">
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -262,6 +424,64 @@
         document.querySelectorAll('.column-search').forEach(input => {
             input.addEventListener('input', handleSearch);
         });
+
+        function openEditModal(id, name, category, subCategory, description, lat, lon, address, phone, website, hours, rank) {
+            document.getElementById('poiId').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('category').value = category;
+            document.getElementById('sub_category').value = subCategory;
+            document.getElementById('description').value = description;
+            document.getElementById('latitude').value = lat;
+            document.getElementById('longitude').value = lon;
+            document.getElementById('address').value = address;
+            document.getElementById('phone').value = phone;
+            document.getElementById('website').value = website;
+            document.getElementById('hours').value = hours;
+            document.getElementById('rank').value = rank;
+            
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target == modal) {
+                closeEditModal();
+            }
+        }
+
+        // Close modal when clicking the X
+        document.querySelector('.close').onclick = closeEditModal;
+
+        // Handle form submission
+        document.getElementById('editForm').onsubmit = function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const poiId = formData.get('poi_id');
+            
+            fetch(`/city/{{ city.name }}/poi/${poiId}/edit/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.location.reload();
+                } else {
+                    alert('Error updating POI: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error updating POI: ' + error);
+            });
+        };
     </script>
 {% else %}
     <p>No points of interest in this category.</p>

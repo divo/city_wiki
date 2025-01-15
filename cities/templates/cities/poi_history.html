@@ -17,9 +17,6 @@
             {% if version.revision.user %}
             <p>User: {{ version.revision.user }}</p>
             {% endif %}
-            {% if version.revision.comment %}
-            <p>Comment: {{ version.revision.comment }}</p>
-            {% endif %}
             
             <div class="changes">
                 <h4>Changes:</h4>
@@ -32,7 +29,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                    {% for field, values in version.field_dict.items %}
+                    {% for field, values in version.changes.items %}
                         {% if field != 'id' and field != 'created_at' and field != 'updated_at' %}
                         <tr>
                             <td>{{ field }}</td>
