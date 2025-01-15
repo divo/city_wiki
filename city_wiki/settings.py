@@ -139,3 +139,33 @@ CELERY_RESULT_SERIALIZER = 'json'
 # OpenAI Configuration
 OPENAI_API_KEY = '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'  # Set this in your environment or local_settings.py
 OPENAI_MODEL = 'gpt-4-turbo-preview'  # Default model to use
+
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'cities': {  # This matches our app name
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
