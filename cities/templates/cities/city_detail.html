@@ -130,5 +130,13 @@ function deleteCity(cityName) {
         });
     }
 }
+
+// Add event listener for double-click on search inputs
+document.querySelectorAll('.column-search').forEach(input => {
+    input.addEventListener('dblclick', function() {
+        this.value = '';  // Clear the input
+        this.dispatchEvent(new Event('input'));  // Trigger search update
+    });
+});
 </script>
 {% endblock %}
