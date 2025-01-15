@@ -46,15 +46,14 @@
     .delete-btn:hover {
         background: #c82333;
     }
-    .poi-image {
-        max-width: 100px;
-        max-height: 100px;
-        object-fit: cover;
-        border-radius: 4px;
-        margin-right: 10px;
+    .poi-images-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 10px;
     }
     .poi-image-container {
-        display: inline-flex;
+        display: flex;
         flex-direction: column;
         align-items: center;
         margin-right: 10px;
@@ -67,6 +66,30 @@
         border-radius: 4px;
         margin-bottom: 5px;
         vertical-align: middle;
+        transition: transform 0.2s;
+        cursor: pointer;
+    }
+    .poi-image:hover {
+        transform: scale(1.05);
+    }
+    .poi-image.selectable {
+        border: 2px solid transparent;
+    }
+    .poi-image.selectable:hover {
+        border-color: #007bff;
+    }
+    .save-image-btn {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 2px 6px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.8em;
+        margin-top: 5px;
+    }
+    .save-image-btn:hover {
+        background: #218838;
     }
     .delete-image-btn {
         background: #dc3545;
@@ -113,6 +136,33 @@
         transform: translateY(-1px);
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
+    .image-modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.9);
+    }
+    .image-modal img {
+        max-width: 90%;
+        max-height: 90vh;
+        margin: auto;
+        display: block;
+        position: relative;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    .image-modal .close {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        color: white;
+        font-size: 30px;
+        cursor: pointer;
+    }
 </style>
 
 <div class="container">
@@ -139,11 +189,13 @@
                             {% for poi in list.pois.all %}
                                 <tr>
                                     <td>
-                                        <div style="display: flex; align-items: center;">
+                                        <div style="display: flex; flex-direction: column;">
                                             {% if poi.image_url %}
-                                                <div class="poi-image-container">
-                                                    <img src="{{ poi.image_url }}" class="poi-image" alt="{{ poi.name }}">
-                                                    <button class="delete-image-btn" onclick="deleteImage({{ poi.id }}, this)">Delete Image</button>
+                                                <div class="poi-images-grid" data-poi-id="{{ poi.id }}">
+                                                    <div class="poi-image-container">
+                                                        <img src="{{ poi.image_url }}" class="poi-image" alt="{{ poi.name }}" onclick="showImageModal(this.src)">
+                                                        <button class="delete-image-btn" onclick="deleteImage({{ poi.id }}, this.parentElement)">Delete Image</button>
+                                                    </div>
                                                 </div>
                                             {% endif %}
                                             {{ poi.name }}
@@ -158,7 +210,7 @@
                                             {% if poi.image_url %}
                                                 Image Found
                                             {% else %}
-                                                Fetch Image
+                                                Fetch Images
                                             {% endif %}
                                         </button>
                                     </td>
@@ -175,6 +227,12 @@
             <p>No lists have been generated yet.</p>
         {% endif %}
     </div>
+</div>
+
+<!-- Image Modal -->
+<div id="imageModal" class="image-modal">
+    <span class="close" onclick="closeImageModal()">&times;</span>
+    <img id="modalImage" src="" alt="Full size image">
 </div>
 
 <script>
@@ -215,27 +273,30 @@ document.querySelectorAll('.fetch-image-btn').forEach(button => {
             const data = await response.json();
             
             if (data.status === 'success') {
-                this.textContent = 'Image Found';
-                // Create image container
-                const container = document.createElement('div');
-                container.className = 'poi-image-container';
+                this.textContent = 'Choose Image';
+                const imagesGrid = document.createElement('div');
+                imagesGrid.className = 'poi-images-grid';
+                imagesGrid.dataset.poiId = poiId;
+
+                // Add all images to the grid
+                data.image_urls.forEach((imageUrl, index) => {
+                    const container = document.createElement('div');
+                    container.className = 'poi-image-container';
+                    
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.className = 'poi-image selectable';
+                    img.alt = `${row.querySelector('td:first-child').textContent.trim()} (${index + 1})`;
+                    img.onclick = () => selectImage(imageUrl, poiId, imagesGrid, this);
+                    container.appendChild(img);
+                    
+                    imagesGrid.appendChild(container);
+                });
                 
-                // Create and add image
-                const img = document.createElement('img');
-                img.src = data.image_url;
-                img.className = 'poi-image';
-                container.appendChild(img);
-                
-                // Create and add delete button
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-image-btn';
-                deleteBtn.textContent = 'Delete Image';
-                deleteBtn.onclick = () => deleteImage(poiId, container, this);
-                container.appendChild(deleteBtn);
-                
-                // Add container to the cell
+                // Add grid to the cell
                 const nameCell = row.querySelector('td:first-child');
-                nameCell.insertBefore(container, nameCell.firstChild);
+                const nameDiv = nameCell.querySelector('div');
+                nameDiv.insertBefore(imagesGrid, nameDiv.firstChild);
             } else {
                 this.textContent = 'Failed';
                 this.disabled = false;
@@ -243,12 +304,63 @@ document.querySelectorAll('.fetch-image-btn').forEach(button => {
         } catch (error) {
             this.textContent = 'Error';
             this.disabled = false;
-            console.error('Error fetching image:', error);
+            console.error('Error fetching images:', error);
         }
     });
 });
 
-async function deleteImage(poiId, container, fetchButton) {
+async function selectImage(imageUrl, poiId, imagesGrid, fetchButton) {
+    try {
+        const response = await fetch(`/city/{{ city.name }}/poi/${poiId}/save_image/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                image_url: imageUrl
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            // Create new container with the selected image
+            const container = document.createElement('div');
+            container.className = 'poi-image-container';
+            
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.className = 'poi-image';
+            img.alt = imagesGrid.querySelector('img').alt;
+            img.onclick = () => showImageModal(imageUrl);
+            container.appendChild(img);
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-image-btn';
+            deleteBtn.textContent = 'Delete Image';
+            deleteBtn.onclick = () => deleteImage(poiId, container);
+            container.appendChild(deleteBtn);
+            
+            // Replace the grid with the selected image
+            const newGrid = document.createElement('div');
+            newGrid.className = 'poi-images-grid';
+            newGrid.dataset.poiId = poiId;
+            newGrid.appendChild(container);
+            imagesGrid.replaceWith(newGrid);
+            
+            // Update button state
+            fetchButton.disabled = true;
+            fetchButton.textContent = 'Image Found';
+        } else {
+            alert('Error saving image: ' + data.message);
+        }
+    } catch (error) {
+        alert('Error saving image: ' + error);
+    }
+}
+
+async function deleteImage(poiId, container) {
     if (confirm('Are you sure you want to delete this image?')) {
         try {
             const response = await fetch(`/city/{{ city.name }}/poi/${poiId}/delete_image/`, {
@@ -256,11 +368,19 @@ async function deleteImage(poiId, container, fetchButton) {
             });
             
             const data = await response.json();
-            
             if (data.status === 'success') {
+                const grid = container.closest('.poi-images-grid');
                 container.remove();
-                fetchButton.disabled = false;
-                fetchButton.textContent = 'Fetch Image';
+                
+                // If this was the last image, remove the grid and enable the fetch button
+                if (grid.children.length === 0) {
+                    grid.remove();
+                    const fetchButton = document.querySelector(`.fetch-image-btn[data-poi-id="${poiId}"]`);
+                    if (fetchButton) {
+                        fetchButton.disabled = false;
+                        fetchButton.textContent = 'Fetch Images';
+                    }
+                }
             } else {
                 alert('Error deleting image: ' + data.message);
             }
@@ -269,5 +389,24 @@ async function deleteImage(poiId, container, fetchButton) {
         }
     }
 }
+
+function showImageModal(src) {
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    modal.style.display = 'block';
+    modalImg.src = src;
+}
+
+function closeImageModal() {
+    const modal = document.getElementById('imageModal');
+    modal.style.display = 'none';
+}
+
+// Close modal when clicking outside the image
+document.getElementById('imageModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeImageModal();
+    }
+});
 </script>
 {% endblock %} 

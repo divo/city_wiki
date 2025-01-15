@@ -688,51 +688,83 @@ def check_task_status(request, task_id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def fetch_poi_image(request, city_name, poi_id):
-    """Fetch and save an image URL for a POI."""
+    """Fetch image URLs for a POI without saving any."""
     try:
         city = get_object_or_404(City, name=city_name)
         poi = get_object_or_404(PointOfInterest, id=poi_id, city=city)
         
         # Search Wikimedia Commons
         search_query = poi.name.replace(' ', '+')
-        api_url = f"https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch={search_query}&srnamespace=6&format=json&origin=*"
+        api_url = f"https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch={search_query}&srnamespace=6&format=json&origin=*&srlimit=10"
         
         import requests
         response = requests.get(api_url)
         data = response.json()
         
+        image_urls = []
         if data.get('query', {}).get('search'):
-            # Get the first result
-            first_result = data['query']['search'][0]
-            title = first_result['title']
-            
-            # Get image info for the first result
-            file_url = f"https://commons.wikimedia.org/w/api.php?action=query&titles={title}&prop=imageinfo&iiprop=url&format=json&origin=*"
-            file_response = requests.get(file_url)
-            file_data = file_response.json()
-            
-            # Extract the image URL
-            pages = file_data.get('query', {}).get('pages', {})
-            if pages:
-                page = next(iter(pages.values()))
-                image_info = page.get('imageinfo', [{}])[0]
-                image_url = image_info.get('url')
+            # Get up to 10 results
+            for result in data['query']['search'][:10]:
+                title = result['title']
                 
-                if image_url:
-                    # Save the image URL to the POI
-                    poi.image_url = image_url
-                    poi.save()
+                # Get image info for each result
+                file_url = f"https://commons.wikimedia.org/w/api.php?action=query&titles={title}&prop=imageinfo&iiprop=url&format=json&origin=*"
+                file_response = requests.get(file_url)
+                file_data = file_response.json()
+                
+                # Extract the image URL
+                pages = file_data.get('query', {}).get('pages', {})
+                if pages:
+                    page = next(iter(pages.values()))
+                    image_info = page.get('imageinfo', [{}])[0]
+                    image_url = image_info.get('url')
                     
-                    return JsonResponse({
-                        'status': 'success',
-                        'message': 'Image URL updated',
-                        'image_url': image_url
-                    })
+                    if image_url:
+                        image_urls.append(image_url)
+            
+            if image_urls:
+                return JsonResponse({
+                    'status': 'success',
+                    'message': 'Image URLs found',
+                    'image_urls': image_urls
+                })
         
         return JsonResponse({
             'status': 'error',
-            'message': 'No suitable image found'
+            'message': 'No suitable images found'
         }, status=404)
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_poi_image(request, city_name, poi_id):
+    """Save a specific image URL for a POI."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+        poi = get_object_or_404(PointOfInterest, id=poi_id, city=city)
+        
+        data = json.loads(request.body)
+        image_url = data.get('image_url')
+        
+        if not image_url:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Image URL is required'
+            }, status=400)
+        
+        # Save the image URL
+        poi.image_url = image_url
+        poi.save()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Image URL saved'
+        })
         
     except Exception as e:
         return JsonResponse({

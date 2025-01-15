@@ -25,4 +25,5 @@ urlpatterns = [
     path('tasks/<str:task_id>/status/', views.check_task_status, name='check_task_status'),
     path('city/<str:city_name>/poi/<int:poi_id>/fetch_image/', views.fetch_poi_image, name='fetch_poi_image'),
     path('city/<str:city_name>/poi/<int:poi_id>/delete_image/', views.delete_poi_image, name='delete_poi_image'),
+    path('city/<str:city_name>/poi/<int:poi_id>/save_image/', views.save_poi_image, name='save_poi_image'),
 ]
