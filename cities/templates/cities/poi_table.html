@@ -240,9 +240,14 @@
         }
     </style>
 
-    <div class="selection-actions">
-        <button class="btn btn-primary" onclick="handleMergeSelected()">Merge Selected</button>
-        <span class="selected-count">0 items selected</span>
+    <div id="selectionActions" class="selection-actions" style="display: none; margin-bottom: 1em;">
+        <span id="selectedCount">0 POIs selected</span>
+        <button onclick="handleMergeSelected()" class="btn btn-primary">Merge Selected</button>
+        
+        <div class="list-creation" style="display: inline-block; margin-left: 1em;">
+            <input type="text" id="listTitle" placeholder="Enter list title" class="form-control" style="display: inline-block; width: auto;">
+            <button onclick="createList()" class="btn btn-success">Create List</button>
+        </div>
     </div>
 
     <div class="table-responsive">
@@ -648,12 +653,12 @@
         }
 
         function updateSelectionUI() {
-            const selectionActions = document.querySelector('.selection-actions');
-            const selectedCount = document.querySelector('.selected-count');
+            const selectionActions = document.getElementById('selectionActions');
+            const selectedCount = document.getElementById('selectedCount');
             
             if (selectedRows.size > 0) {
                 selectionActions.style.display = 'block';
-                selectedCount.textContent = `${selectedRows.size} items selected`;
+                selectedCount.textContent = `${selectedRows.size} POIs selected`;
             } else {
                 selectionActions.style.display = 'none';
             }
@@ -858,6 +863,47 @@
             .catch(error => {
                 alert('Error merging POIs: ' + error);
             });
+        }
+
+        async function createList() {
+            const selectedIds = Array.from(document.querySelectorAll('input[name="poi_checkbox"]:checked')).map(cb => cb.value);
+            const title = document.getElementById('listTitle').value.trim();
+            
+            if (!title) {
+                alert('Please enter a list title');
+                return;
+            }
+            
+            if (selectedIds.length === 0) {
+                alert('Please select POIs for the list');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/city/${encodeURIComponent('{{ city.name }}')}/lists/create/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        poi_ids: selectedIds
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.status === 'success') {
+                    alert('List created successfully');
+                    document.getElementById('listTitle').value = '';
+                    // Uncheck all checkboxes
+                    document.querySelectorAll('input[name="poi_checkbox"]').forEach(cb => cb.checked = false);
+                    updateSelectionUI();
+                } else {
+                    alert('Error creating list: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error creating list: ' + error);
+            }
         }
     </script>
 {% else %}

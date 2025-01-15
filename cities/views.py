@@ -549,3 +549,47 @@ def poi_lists(request, city_name):
         'city': city,
         'poi_lists': poi_lists,
     })
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def create_poi_list(request, city_name):
+    """Create a new POI list."""
+    try:
+        data = json.loads(request.body)
+        title = data.get('title')
+        poi_ids = data.get('poi_ids', [])
+        
+        if not title:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Title is required'
+            }, status=400)
+            
+        if not poi_ids:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'At least one POI must be selected'
+            }, status=400)
+        
+        city = get_object_or_404(City, name=city_name)
+        
+        # Create the list
+        poi_list = PoiList.objects.create(
+            title=title,
+            city=city
+        )
+        
+        # Add POIs to the list
+        pois = PointOfInterest.objects.filter(id__in=poi_ids, city=city)
+        poi_list.pois.add(*pois)
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'List created successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
