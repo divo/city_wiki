@@ -144,8 +144,8 @@
                             <tr>
                                 <th>POI 1</th>
                                 <th>POI 2</th>
-                                <th>Reason</th>
-                                <th>Actions</th>
+                                <th>Duplicate Reason</th>
+                                <th>Merge Status</th>
                             </tr>
                         </thead>
                         <tbody id="duplicatesTableBody">
@@ -287,16 +287,13 @@ function showSuccess(message, data) {
     
     if (data?.result?.duplicates?.length > 0) {
         data.result.duplicates.forEach(duplicate => {
+            const [reasons, mergeStatus] = duplicate.reason.split(' | ');
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${escapeHtml(duplicate.poi1_name)}</td>
                 <td>${escapeHtml(duplicate.poi2_name)}</td>
-                <td>${escapeHtml(duplicate.reason)}</td>
-                <td>
-                    <button class="btn btn-sm btn-primary" onclick="openMergeModal(${duplicate.poi1_id}, ${duplicate.poi2_id})">
-                        Merge
-                    </button>
-                </td>
+                <td>${escapeHtml(reasons)}</td>
+                <td>${escapeHtml(mergeStatus)}</td>
             `;
             tableBody.appendChild(row);
         });

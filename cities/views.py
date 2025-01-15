@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 ENRICHMENT_TASKS = [
     ('normalize_categories', 'Normalize Categories'),
     ('geocode_addresses', 'Geocode Missing Addresses'),
-    ('dedup_main_city', 'Find Duplicates in Main City'),
+    ('dedup_main_city', 'Merge Duplicates in Main City'),
     # Add more tasks here as they're implemented
 ]
 

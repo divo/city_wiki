@@ -6,6 +6,7 @@ from django.db import transaction
 import logging
 from difflib import SequenceMatcher
 from django.db.models import Q
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +30,16 @@ def dedup_main_city(city_id):
         main_pois = PointOfInterest.objects.filter(
             city=city,
             district__isnull=True
-        ).values('id', 'name', 'category', 'latitude', 'longitude', 'address')
+        ).values('id', 'name', 'category', 'latitude', 'longitude', 'address', 'rank')
         
         # Get all POIs in the city (including districts)
         all_pois = PointOfInterest.objects.filter(
             city=city
-        ).values('id', 'name', 'category', 'latitude', 'longitude', 'address', 'district__name')
+        ).values('id', 'name', 'category', 'latitude', 'longitude', 'address', 'district__name', 'rank')
         
         duplicates = []
         processed = set()  # Track processed pairs to avoid duplicates
+        merged_count = 0
         
         # Compare each main city POI against all POIs
         for main_poi in main_pois:
@@ -91,20 +93,49 @@ def dedup_main_city(city_id):
                         other_poi_name += f" ({other_poi['district__name']})"
                     else:
                         other_poi_name += " (Main City)"
+                    
+                    # Merge the POIs
+                    merge_data = {
+                        'keep_id': other_poi['id'],  # Keep the non-main city POI
+                        'remove_id': main_poi['id'],  # Remove the main city POI
+                        'field_selections': {
+                            'name': main_poi['name'],  # Take name from main city POI
+                            'district': f"{other_poi['district__name']}, Main City",  # Append Main City to district
+                            'rank': min(main_poi['rank'], other_poi['rank'])  # Take lower rank
+                        }
+                    }
+                    
+                    merge_status = "❌ Merge not attempted"
+                    try:
+                        # Make request to poi_merge endpoint
+                        response = requests.post(
+                            f'http://localhost:8000/city/{city.name}/poi/merge/',
+                            json=merge_data,
+                            headers={'Content-Type': 'application/json'}
+                        )
                         
+                        if response.status_code == 200:
+                            merged_count += 1
+                            merge_status = "✅ Successfully merged"
+                        else:
+                            merge_status = f"❌ Merge failed: {response.text}"
+                    except Exception as e:
+                        logger.error(f"Error merging POIs: {str(e)}")
+                        merge_status = f"❌ Merge error: {str(e)}"
+                    
                     duplicates.append({
                         'poi1_id': main_poi['id'],
                         'poi1_name': main_poi_name,
                         'poi2_id': other_poi['id'],
                         'poi2_name': other_poi_name,
-                        'reason': ' & '.join(reason)
+                        'reason': f"{' & '.join(reason)} | {merge_status}"
                     })
         
-        logger.info(f"Found {len(duplicates)} potential duplicate pairs in {city.name}")
+        logger.info(f"Found {len(duplicates)} potential duplicate pairs in {city.name}, merged {merged_count}")
         
         return {
             'status': 'success',
-            'message': f'Found {len(duplicates)} potential duplicate pairs for main city POIs',
+            'message': f'Found {len(duplicates)} potential duplicate pairs for main city POIs, merged {merged_count}',
             'duplicates': duplicates
         }
         
