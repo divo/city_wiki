@@ -160,7 +160,7 @@ Remember: All POIs mentioned must be from this exact list: {sorted(list(all_poi_
 
 def generate_list(request, city_name):
     """Generate structured JSON lists of POIs using OpenAI's API."""
-    with open('debug.log', 'a') as f:
+    with open('debug.log', 'a', encoding='utf-8') as f:
         try:
             f.write("\n\nStarting generate_list function\n")
             city = get_object_or_404(City, name=city_name)
@@ -186,8 +186,16 @@ def generate_list(request, city_name):
             all_poi_names = set()  # Track all POI names for validation
             poi_lookup = {}  # Map POI names to their full objects
             for poi in pois:
-                category = poi.category
-                district = poi.district.name if poi.district else 'Main City'
+                # Ensure all text fields are properly encoded
+                category = str(poi.category or '').encode('utf-8').decode('utf-8')
+                district = str(poi.district.name if poi.district else 'Main City').encode('utf-8').decode('utf-8')
+                name = str(poi.name or '').encode('utf-8').decode('utf-8')
+                sub_category = str(poi.sub_category or '').encode('utf-8').decode('utf-8')
+                description = str(poi.description or '').encode('utf-8').decode('utf-8')
+                address = str(poi.address or '').encode('utf-8').decode('utf-8')
+                phone = str(poi.phone or '').encode('utf-8').decode('utf-8')
+                website = str(poi.website or '').encode('utf-8').decode('utf-8')
+                hours = str(poi.hours or '').encode('utf-8').decode('utf-8')
                 
                 if category not in poi_data:
                     poi_data[category] = {}
@@ -195,20 +203,20 @@ def generate_list(request, city_name):
                 if district not in poi_data[category]:
                     poi_data[category][district] = []
                     
-                poi_data[category][district].append(poi.name)
-                all_poi_names.add(poi.name)
-                poi_lookup[poi.name] = {
+                poi_data[category][district].append(name)
+                all_poi_names.add(name)
+                poi_lookup[name] = {
                     'id': poi.id,
-                    'name': poi.name,
-                    'category': poi.category,
-                    'sub_category': poi.sub_category,
-                    'description': poi.description,
+                    'name': name,
+                    'category': category,
+                    'sub_category': sub_category,
+                    'description': description,
                     'latitude': poi.latitude,
                     'longitude': poi.longitude,
-                    'address': poi.address,
-                    'phone': poi.phone,
-                    'website': poi.website,
-                    'hours': poi.hours,
+                    'address': address,
+                    'phone': phone,
+                    'website': website,
+                    'hours': hours,
                     'rank': poi.rank,
                     'district': district
                 }
@@ -228,7 +236,7 @@ def generate_list(request, city_name):
                 }, status=500)
             
             # Get the prompt from the request
-            prompt = request.POST.get('prompt', '')
+            prompt = request.POST.get('prompt', '').encode('utf-8').decode('utf-8')
             if not prompt:
                 return JsonResponse({
                     'status': 'error',
@@ -260,6 +268,7 @@ IMPORTANT: You must respond with valid JSON only. Your response should follow th
 
 Remember: 
 1. All POIs mentioned must be from this exact list: {sorted(list(all_poi_names))}
+2. All POIs mentioned must be written exactly the same as in the dataset. Do not use abbreviations or other variations. These are used as keys.
 2. You MUST include EXACTLY {count} POIs in your response, no more, no less
 3. Do not create multiple sublists - just one single list with {count} items"""
 
@@ -272,7 +281,7 @@ Remember:
                     model="gpt-4-0125-preview",  # Use explicit model name
                     messages=[
                         {"role": "system", "content": system_message},
-                        {"role": "user", "content": f"City data: {json.dumps(poi_data, indent=2)}\n\nPrompt: {prompt}"}
+                        {"role": "user", "content": f"City data: {json.dumps(poi_data, indent=2, ensure_ascii=False)}\n\nPrompt: {prompt}"}
                     ],
                     temperature=0.7,
                     response_format={ "type": "json_object" },
@@ -290,7 +299,8 @@ Remember:
             # Parse the response to ensure it's valid JSON
             try:
                 f.write("Parsing response...\n")
-                list_data = json.loads(response.choices[0].message.content)
+                response_content = response.choices[0].message.content.encode('utf-8').decode('utf-8')
+                list_data = json.loads(response_content)
                 f.write("Successfully parsed OpenAI response as JSON\n")
                 
                 # Validate that exactly count POIs are included
@@ -330,7 +340,7 @@ Remember:
                     'list': list_data,
                     'prompt': prompt,
                     'model': settings.OPENAI_MODEL,
-                }, json_dumps_params={'indent': 2})
+                }, json_dumps_params={'indent': 2, 'ensure_ascii': False})
                 
             except json.JSONDecodeError as e:
                 f.write(f"Failed to parse OpenAI response as JSON: {str(e)}\n")

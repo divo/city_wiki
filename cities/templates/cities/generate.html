@@ -187,12 +187,13 @@
         margin-bottom: 10px;
     }
 
-    .mentioned-pois {
+    .mentioned-pois, .missing-pois {
         list-style-type: none;
         padding-left: 0;
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
+        margin-bottom: 15px;
     }
 
     .mentioned-pois li {
@@ -201,6 +202,14 @@
         border-radius: 12px;
         font-size: 0.9em;
         color: #495057;
+    }
+
+    .missing-pois li {
+        background: #f8d7da;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.9em;
+        color: #721c24;
     }
 
     .list-section {
@@ -232,21 +241,48 @@
     }
 
     .poi-item {
-        margin-bottom: 10px;
-        padding: 10px;
         background: white;
+        padding: 15px;
+        margin-bottom: 15px;
         border-radius: 4px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
     .poi-name {
+        font-size: 1.2em;
         font-weight: bold;
         color: #2c3e50;
+        margin-bottom: 8px;
     }
 
     .poi-reason {
         color: #666;
-        margin-top: 5px;
+        margin-bottom: 12px;
+        font-style: italic;
+    }
+
+    .poi-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid #eee;
+    }
+
+    .poi-detail {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .poi-detail-label {
         font-size: 0.9em;
+        color: #666;
+        margin-bottom: 2px;
+    }
+
+    .poi-detail-value {
+        color: #2c3e50;
     }
 
     .type-select {
@@ -270,6 +306,76 @@
         margin-top: 10px;
         color: #666;
         font-style: italic;
+    }
+
+    .table-responsive {
+        margin: 0 -15px;
+        width: calc(100% + 30px);
+    }
+
+    .poi-table {
+        width: 100%;
+        min-width: 1200px;
+        margin-bottom: 1rem;
+        border-collapse: collapse;
+    }
+
+    .poi-table td {
+        padding: 8px;
+        vertical-align: top;
+        border-top: 1px solid #dee2e6;
+        max-width: 300px;
+        word-wrap: break-word;
+    }
+
+    .poi-table th {
+        padding: 12px 8px;
+        border-bottom: 2px solid #dee2e6;
+        background-color: #f8f9fa;
+        white-space: nowrap;
+    }
+
+    /* Column specific widths */
+    .poi-table td:nth-child(1) { width: 15%; }  /* Name */
+    .poi-table td:nth-child(2) { width: 10%; }  /* Category */
+    .poi-table td:nth-child(3) { width: 10%; }  /* District */
+    .poi-table td:nth-child(4) { width: 25%; }  /* Description */
+    .poi-table td:nth-child(5) { width: 10%; }  /* Address */
+    .poi-table td:nth-child(6) { width: 10%; }  /* Contact */
+    .poi-table td:nth-child(7) { width: 10%; }  /* Hours */
+    .poi-table td:nth-child(8) { width: 10%; }  /* Website */
+
+    .empty-cell {
+        background-color: #ffebee;
+    }
+
+    .list-creation {
+        margin-top: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+
+    .list-creation input {
+        width: 300px;
+        padding: 8px;
+        margin-right: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .btn-success {
+        color: #fff;
+        background-color: #28a745;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .btn-success:hover {
+        background-color: #218838;
     }
 </style>
 
@@ -352,9 +458,32 @@
         <!-- List View -->
         <div id="listView" style="display: none;">
             <div class="list-section">
-                <h2 id="listTitle"></h2>
+                <h2 id="generatedListTitle"></h2>
                 <p id="listDescription"></p>
-                <div id="poiList"></div>
+                
+                <div class="list-creation">
+                    <input type="text" id="saveListTitle" placeholder="Enter list title" class="form-control">
+                    <button onclick="createList()" class="btn btn-success">Save as List</button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="poi-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Category</th>
+                                <th>District</th>
+                                <th>Description</th>
+                                <th>Address</th>
+                                <th>Contact</th>
+                                <th>Hours</th>
+                                <th>Website</th>
+                            </tr>
+                        </thead>
+                        <tbody id="poiList">
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -365,6 +494,11 @@
             <div class="validation-details">
                 <h3>Referenced POIs:</h3>
                 <ul class="mentioned-pois" id="mentionedPois"></ul>
+                <div id="missingPoisSection" style="display: none;">
+                    <h3>Missing POIs:</h3>
+                    <p class="text-muted">These POIs were mentioned but not found in the database:</p>
+                    <ul class="missing-pois" id="missingPois"></ul>
+                </div>
             </div>
         </div>
 
@@ -435,19 +569,34 @@ document.getElementById('generateForm').addEventListener('submit', async functio
             if (generationType === 'list') {
                 // Display the list response
                 const listData = data.list;
+                currentListData = listData;
                 
                 // Update title and description
-                document.getElementById('listTitle').textContent = listData.title;
+                document.getElementById('generatedListTitle').textContent = listData.title;
                 document.getElementById('listDescription').textContent = listData.description;
                 
                 // Update POI list
                 const poiListContainer = document.getElementById('poiList');
                 poiListContainer.innerHTML = listData.pois
                     .map(poi => `
-                        <div class="poi-item">
-                            <div class="poi-name">${poi.name}</div>
-                            <div class="poi-reason">${poi.reason}</div>
-                        </div>
+                        <tr>
+                            <td>
+                                <strong>${poi.name}</strong>
+                                <div class="text-muted" style="font-size: 0.9em; margin-top: 4px;">${poi.reason}</div>
+                            </td>
+                            <td ${!poi.details.category ? 'class="empty-cell"' : ''}>
+                                ${poi.details.category}
+                                ${poi.details.sub_category ? `<br><small>${poi.details.sub_category}</small>` : ''}
+                            </td>
+                            <td ${!poi.details.district ? 'class="empty-cell"' : ''}>${poi.details.district}</td>
+                            <td ${!poi.details.description ? 'class="empty-cell"' : ''}>${poi.details.description || ''}</td>
+                            <td ${!poi.details.address ? 'class="empty-cell"' : ''}>${poi.details.address || ''}</td>
+                            <td ${!poi.details.phone ? 'class="empty-cell"' : ''}>${poi.details.phone || ''}</td>
+                            <td ${!poi.details.hours ? 'class="empty-cell"' : ''}>${poi.details.hours || ''}</td>
+                            <td ${!poi.details.website ? 'class="empty-cell"' : ''}>
+                                ${poi.details.website ? `<a href="${poi.details.website}" target="_blank" rel="noopener noreferrer">Visit Website</a>` : ''}
+                            </td>
+                        </tr>
                     `)
                     .join('');
                 
@@ -461,6 +610,18 @@ document.getElementById('generateForm').addEventListener('submit', async functio
                     listData._validation.mentioned_poi_names
                         .map(poi => `<li>${poi}</li>`)
                         .join('');
+                
+                // Handle missing POIs
+                const missingPoisSection = document.getElementById('missingPoisSection');
+                const missingPoisList = document.getElementById('missingPois');
+                if (listData._validation.missing_pois && listData._validation.missing_pois.length > 0) {
+                    missingPoisList.innerHTML = listData._validation.missing_pois
+                        .map(poi => `<li>${poi}</li>`)
+                        .join('');
+                    missingPoisSection.style.display = 'block';
+                } else {
+                    missingPoisSection.style.display = 'none';
+                }
                 
                 // Update raw JSON
                 document.getElementById('rawJson').textContent = 
@@ -537,6 +698,49 @@ document.getElementById('generateForm').addEventListener('submit', async functio
 function toggleRawJson() {
     const rawJson = document.getElementById('rawJson');
     rawJson.style.display = rawJson.style.display === 'none' ? 'block' : 'none';
+}
+
+let currentListData = null;
+
+async function createList() {
+    if (!currentListData) {
+        alert('No list data available');
+        return;
+    }
+
+    const titleInput = document.getElementById('saveListTitle');
+    const title = titleInput.value.trim();
+    
+    if (!title) {
+        alert('Please enter a title for the list');
+        return;
+    }
+
+    try {
+        const poiIds = currentListData.pois.map(poi => poi.details.id);
+        
+        const response = await fetch(`/city/${encodeURIComponent(document.getElementById('citySelect').value)}/lists/create/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                title: title,
+                poi_ids: poiIds
+            })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('List created successfully!');
+            titleInput.value = '';
+        } else {
+            throw new Error(data.message || 'Failed to create list');
+        }
+    } catch (error) {
+        alert('Error creating list: ' + error.message);
+    }
 }
 </script>
 {% endblock %} 
