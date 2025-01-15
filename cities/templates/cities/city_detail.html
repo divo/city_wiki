@@ -99,6 +99,63 @@
         </div>
     </div>
 
+    <div class="task-section mb-4">
+        <h3>Data Enrichment Tasks</h3>
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-end">
+                    <div class="col-md-6">
+                        <label for="taskSelect" class="form-label">Select Task:</label>
+                        <select id="taskSelect" class="form-select">
+                            <option value="">Choose a task...</option>
+                            {% for task_id, task_name in enrichment_tasks %}
+                                <option value="{{ task_id }}">{{ task_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <button id="executeTask" class="btn btn-primary" disabled>Execute Task</button>
+                    </div>
+                </div>
+                
+                <!-- Task Status Section -->
+                <div id="taskStatus" class="mt-3" style="display: none;">
+                    <div class="alert alert-info">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span id="taskStatusText">Task is running...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Task Result Section -->
+                <div id="taskResult" class="mt-3" style="display: none;">
+                    <div class="alert">
+                        <span id="taskResultText"></span>
+                    </div>
+                </div>
+
+                <!-- Add this after the task result section -->
+                <div id="duplicatesTable" class="mt-3" style="display: none;">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>POI 1</th>
+                                <th>POI 2</th>
+                                <th>Reason</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="duplicatesTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     {% for category, pois in pois_by_category.items %}
         <section class="category-section">
             <h2>{{ category|title }} ({{ pois|length }})</h2>
@@ -139,5 +196,131 @@ document.querySelectorAll('.column-search').forEach(input => {
         this.dispatchEvent(new Event('input'));  // Trigger search update
     });
 });
+
+let currentTaskId = null;
+let pollingInterval = null;
+
+document.getElementById('taskSelect').addEventListener('change', function() {
+    const executeButton = document.getElementById('executeTask');
+    executeButton.disabled = !this.value;
+});
+
+document.getElementById('executeTask').addEventListener('click', async function() {
+    const taskId = document.getElementById('taskSelect').value;
+    if (!taskId) return;
+    
+    // Reset UI
+    document.getElementById('taskResult').style.display = 'none';
+    document.getElementById('taskStatus').style.display = 'block';
+    this.disabled = true;
+    document.getElementById('taskSelect').disabled = true;
+    
+    try {
+        // Start the task
+        const response = await fetch(`/city/{{ city.name }}/tasks/${taskId}/execute/`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            currentTaskId = data.task_id;
+            startPolling();
+        } else {
+            showError(data.message || 'Failed to start task');
+        }
+    } catch (error) {
+        showError('Error starting task: ' + error.message);
+    }
+});
+
+function startPolling() {
+    if (pollingInterval) clearInterval(pollingInterval);
+    
+    pollingInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`/tasks/${currentTaskId}/status/`);
+            const data = await response.json();
+            
+            if (data.status === 'completed') {
+                clearInterval(pollingInterval);
+                showSuccess(data.result.message, data);
+                resetUI();
+            } else if (data.status === 'failed') {
+                clearInterval(pollingInterval);
+                showError(data.error || 'Task failed');
+                resetUI();
+            }
+            // Continue polling if status is 'processing'
+            
+        } catch (error) {
+            clearInterval(pollingInterval);
+            showError('Error checking task status: ' + error.message);
+            resetUI();
+        }
+    }, 500);
+}
+
+function showError(message) {
+    const resultDiv = document.getElementById('taskResult');
+    const resultText = document.getElementById('taskResultText');
+    resultDiv.style.display = 'block';
+    resultDiv.querySelector('.alert').className = 'alert alert-danger';
+    resultText.textContent = message;
+    document.getElementById('taskStatus').style.display = 'none';
+}
+
+function showSuccess(message, data) {
+    const resultDiv = document.getElementById('taskResult');
+    const resultText = document.getElementById('taskResultText');
+    resultDiv.style.display = 'block';
+    resultDiv.querySelector('.alert').className = 'alert alert-success';
+    resultText.textContent = message;
+    document.getElementById('taskStatus').style.display = 'none';
+    
+    // Check if we have duplicates to display
+    const duplicatesTable = document.getElementById('duplicatesTable');
+    const tableBody = document.getElementById('duplicatesTableBody');
+    
+    // Always clear the table body first
+    tableBody.innerHTML = '';
+    
+    if (data?.result?.duplicates?.length > 0) {
+        data.result.duplicates.forEach(duplicate => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${escapeHtml(duplicate.poi1_name)}</td>
+                <td>${escapeHtml(duplicate.poi2_name)}</td>
+                <td>${escapeHtml(duplicate.reason)}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="openMergeModal(${duplicate.poi1_id}, ${duplicate.poi2_id})">
+                        Merge
+                    </button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+        
+        duplicatesTable.style.display = 'table';
+    } else {
+        duplicatesTable.style.display = 'none';
+    }
+}
+
+// Helper function to safely escape HTML
+function escapeHtml(unsafe) {
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function resetUI() {
+    document.getElementById('executeTask').disabled = false;
+    document.getElementById('taskSelect').disabled = false;
+    currentTaskId = null;
+}
 </script>
 {% endblock %}
