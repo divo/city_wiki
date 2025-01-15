@@ -144,8 +144,7 @@
                             <tr>
                                 <th>POI 1</th>
                                 <th>POI 2</th>
-                                <th>Duplicate Reason</th>
-                                <th>Merge Status</th>
+                                <th>Reason</th>
                             </tr>
                         </thead>
                         <tbody id="duplicatesTableBody">
@@ -287,13 +286,17 @@ function showSuccess(message, data) {
     
     if (data?.result?.duplicates?.length > 0) {
         data.result.duplicates.forEach(duplicate => {
-            const [reasons, mergeStatus] = duplicate.reason.split(' | ');
+            // Check if this is a merge result (has a merge status) or just a find result
+            let [reasons, mergeStatus] = (duplicate.reason || '').split(' | ');
+            if (!mergeStatus) {
+                reasons = duplicate.reason;
+            }
+            
             const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${escapeHtml(duplicate.poi1_name)}</td>
                 <td>${escapeHtml(duplicate.poi2_name)}</td>
                 <td>${escapeHtml(reasons)}</td>
-                <td>${escapeHtml(mergeStatus)}</td>
             `;
             tableBody.appendChild(row);
         });

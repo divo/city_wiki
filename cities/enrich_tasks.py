@@ -16,6 +16,108 @@ def similar(a, b, threshold=0.85):
         return False
     return SequenceMatcher(None, a.lower(), b.lower()).ratio() > threshold
 
+def detect_duplicate_pois(poi1, poi2):
+    """
+    Check if two POIs are potential duplicates based on various criteria.
+    Returns (is_duplicate, reasons) tuple.
+    """
+    reasons = []
+    
+    # Calculate various similarity scores
+    name_similarity = similar(poi1['name'], poi2['name'], threshold=0.85)
+    same_category = poi1['category'] == poi2['category']
+    
+    # Check coordinates if both POIs have them
+    close_coordinates = False
+    if (poi1['latitude'] and poi1['longitude'] and 
+        poi2['latitude'] and poi2['longitude']):
+        # Simple distance check (could be improved with proper geo-distance)
+        lat_diff = abs(poi1['latitude'] - poi2['latitude'])
+        lon_diff = abs(poi1['longitude'] - poi2['longitude'])
+        close_coordinates = lat_diff < 0.001 and lon_diff < 0.001  # Roughly 100m
+    
+    # Check address similarity if both have addresses
+    address_similarity = similar(poi1['address'], poi2['address'], threshold=0.85)
+    
+    # Determine if this pair should be flagged as potential duplicates
+    is_duplicate = False
+    
+    if name_similarity:
+        is_duplicate = True
+        reasons.append("Similar names")
+    
+    if same_category and (close_coordinates or address_similarity):
+        is_duplicate = True
+        if close_coordinates:
+            reasons.append("Same category and very close locations")
+        if address_similarity:
+            reasons.append("Same category and similar addresses")
+    
+    return is_duplicate, reasons
+
+@shared_task
+def find_all_duplicates(city_id):
+    """
+    Find potential duplicates by comparing all POIs against each other in the city.
+    Returns a list of potential duplicate pairs with their similarity scores.
+    """
+    try:
+        city = City.objects.get(id=city_id)
+        logger.info(f"Starting full duplicate detection for {city.name}")
+        
+        # Get all POIs in the city
+        all_pois = PointOfInterest.objects.filter(
+            city=city
+        ).values('id', 'name', 'category', 'latitude', 'longitude', 'address', 'district__name', 'rank')
+        
+        duplicates = []
+        processed = set()  # Track processed pairs to avoid duplicates
+        merged_count = 0
+        
+        # Compare each POI against all others
+        for i, poi1 in enumerate(all_pois):
+            for poi2 in list(all_pois)[i+1:]:  # Start from i+1 to avoid self-comparisons and duplicates
+                pair_key = tuple(sorted([poi1['id'], poi2['id']]))
+                if pair_key in processed:
+                    continue
+                
+                processed.add(pair_key)
+                
+                is_duplicate, reasons = detect_duplicate_pois(poi1, poi2)
+                
+                if is_duplicate:
+                    # Add location context to the names
+                    poi1_name = poi1['name']
+                    poi2_name = poi2['name']
+                    if poi1['district__name']:
+                        poi1_name += f" ({poi1['district__name']})"
+                    else:
+                        poi1_name += " (Main City)"
+                    if poi2['district__name']:
+                        poi2_name += f" ({poi2['district__name']})"
+                    else:
+                        poi2_name += " (Main City)"
+                    
+                    duplicates.append({
+                        'poi1_id': poi1['id'],
+                        'poi1_name': poi1_name,
+                        'poi2_id': poi2['id'],
+                        'poi2_name': poi2_name,
+                        'reason': ' & '.join(reasons)
+                    })
+        
+        logger.info(f"Found {len(duplicates)} potential duplicate pairs in {city.name}")
+        
+        return {
+            'status': 'success',
+            'message': f'Found {len(duplicates)} potential duplicate pairs',
+            'duplicates': duplicates
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in find_all_duplicates task: {str(e)}")
+        raise
+
 @shared_task
 def dedup_main_city(city_id):
     """
@@ -54,36 +156,7 @@ def dedup_main_city(city_id):
                 
                 processed.add(pair_key)
                 
-                # Calculate various similarity scores
-                name_similarity = similar(main_poi['name'], other_poi['name'], threshold=0.85)
-                same_category = main_poi['category'] == other_poi['category']
-                
-                # Check coordinates if both POIs have them
-                close_coordinates = False
-                if (main_poi['latitude'] and main_poi['longitude'] and 
-                    other_poi['latitude'] and other_poi['longitude']):
-                    # Simple distance check (could be improved with proper geo-distance)
-                    lat_diff = abs(main_poi['latitude'] - other_poi['latitude'])
-                    lon_diff = abs(main_poi['longitude'] - other_poi['longitude'])
-                    close_coordinates = lat_diff < 0.001 and lon_diff < 0.001  # Roughly 100m
-                
-                # Check address similarity if both have addresses
-                address_similarity = similar(main_poi['address'], other_poi['address'], threshold=0.85)
-                
-                # Determine if this pair should be flagged as potential duplicates
-                is_duplicate = False
-                reason = []
-                
-                if name_similarity:
-                    is_duplicate = True
-                    reason.append("Similar names")
-                
-                if same_category and (close_coordinates or address_similarity):
-                    is_duplicate = True
-                    if close_coordinates:
-                        reason.append("Same category and very close locations")
-                    if address_similarity:
-                        reason.append("Same category and similar addresses")
+                is_duplicate, reasons = detect_duplicate_pois(main_poi, other_poi)
                 
                 if is_duplicate:
                     # Add location context to the names
@@ -128,7 +201,7 @@ def dedup_main_city(city_id):
                         'poi1_name': main_poi_name,
                         'poi2_id': other_poi['id'],
                         'poi2_name': other_poi_name,
-                        'reason': f"{' & '.join(reason)} | {merge_status}"
+                        'reason': f"{' & '.join(reasons)} | {merge_status}"
                     })
         
         logger.info(f"Found {len(duplicates)} potential duplicate pairs in {city.name}, merged {merged_count}")
