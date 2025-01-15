@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1>History for {{ poi.name }}</h1>
+    <p>Category: {{ poi.category }}</p>
+    <p>City: {{ poi.city.name }}</p>
+    {% if poi.district %}
+    <p>District: {{ poi.district.name }}</p>
+    {% endif %}
+
+    <div class="history-list">
+        {% for version in versions %}
+        <div class="history-item">
+            <h3>Version {{ forloop.revcounter }}</h3>
+            <p>Date: {{ version.revision.date_created }}</p>
+            {% if version.revision.user %}
+            <p>User: {{ version.revision.user }}</p>
+            {% endif %}
+            {% if version.revision.comment %}
+            <p>Comment: {{ version.revision.comment }}</p>
+            {% endif %}
+            
+            <div class="changes">
+                <h4>Changes:</h4>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th>Old Value</th>
+                            <th>New Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for field, values in version.field_dict.items %}
+                        {% if field != 'id' and field != 'created_at' and field != 'updated_at' %}
+                        <tr>
+                            <td>{{ field }}</td>
+                            <td>{{ values.old|default:"" }}</td>
+                            <td>{{ values.new|default:"" }}</td>
+                        </tr>
+                        {% endif %}
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="actions">
+                <form method="post" action="{% url 'poi_revert' poi.city.name poi.id version.revision.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-warning">Revert to this version</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="mt-4">
+        <a href="{% url 'city_detail' poi.city.name %}" class="btn btn-secondary">Back to City</a>
+    </div>
+</div>
+
+<style>
+.history-item {
+    border: 1px solid #ddd;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+}
+
+.changes {
+    margin-top: 15px;
+}
+
+.table {
+    width: 100%;
+    margin-bottom: 1rem;
+    border-collapse: collapse;
+}
+
+.table th,
+.table td {
+    padding: 0.75rem;
+    border: 1px solid #dee2e6;
+}
+
+.table thead th {
+    background-color: #f8f9fa;
+}
+
+.actions {
+    margin-top: 15px;
+}
+
+.btn {
+    padding: 0.375rem 0.75rem;
+    border-radius: 0.25rem;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-warning {
+    color: #212529;
+    background-color: #ffc107;
+    border-color: #ffc107;
+}
+
+.btn-secondary {
+    color: #fff;
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+/* Make container wider like in city_detail */
+.container {
+    max-width: 95%;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+</style>
+{% endblock %} 

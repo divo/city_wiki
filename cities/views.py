@@ -14,6 +14,8 @@ import json
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
 from . import generation
+import reversion
+from reversion.models import Version
 
 logger = logging.getLogger(__name__)
 
@@ -313,3 +315,56 @@ def city_list_json(request):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+def poi_history(request, city_name, poi_id):
+    """Display version history for a POI."""
+    poi = get_object_or_404(PointOfInterest, id=poi_id, city__name=city_name)
+    
+    # Get all versions for this POI
+    versions = Version.objects.get_for_object(poi)
+    
+    # Process versions to show changes
+    processed_versions = []
+    previous_data = None
+    
+    for version in versions:
+        current_data = version.field_dict
+        
+        if previous_data:
+            # Compare with previous version to show changes
+            changes = {}
+            for field, value in current_data.items():
+                if field in previous_data and previous_data[field] != value:
+                    changes[field] = {
+                        'old': previous_data[field],
+                        'new': value
+                    }
+            version.field_dict = changes
+        else:
+            # First version - show all fields as new
+            changes = {field: {'old': None, 'new': value} 
+                      for field, value in current_data.items()}
+            version.field_dict = changes
+            
+        processed_versions.append(version)
+        previous_data = current_data
+    
+    return render(request, 'cities/poi_history.html', {
+        'poi': poi,
+        'versions': processed_versions,
+    })
+
+@require_http_methods(["POST"])
+def poi_revert(request, city_name, poi_id, revision_id):
+    """Revert a POI to a specific version."""
+    poi = get_object_or_404(PointOfInterest, id=poi_id, city__name=city_name)
+    revision = get_object_or_404(reversion.models.Revision, id=revision_id)
+    
+    with reversion.create_revision():
+        revision.revert()
+        reversion.set_comment(f"Reverted to version from {revision.date_created}")
+        if request.user.is_authenticated:
+            reversion.set_user(request.user)
+    
+    messages.success(request, f"Successfully reverted {poi.name} to version from {revision.date_created}")
+    return redirect('poi_history', city_name=city_name, poi_id=poi_id)

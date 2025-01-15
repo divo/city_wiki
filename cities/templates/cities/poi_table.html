@@ -1,4 +1,70 @@
 {% if pois %}
+    <style>
+        .table-responsive {
+            margin: 0 -15px;  /* Negative margin to break out of container padding */
+            width: calc(100% + 30px);  /* Compensate for negative margin */
+        }
+        
+        .poi-table {
+            width: 100%;
+            min-width: 1400px;  /* Ensure table has a good minimum width */
+            margin-bottom: 1rem;
+            border-collapse: collapse;
+        }
+
+        .poi-table td {
+            padding: 8px;
+            vertical-align: top;
+            border-top: 1px solid #dee2e6;
+            max-width: 300px;  /* Prevent any column from getting too wide */
+            word-wrap: break-word;  /* Allow long words to break */
+        }
+
+        .poi-table th {
+            padding: 12px 8px;
+            border-bottom: 2px solid #dee2e6;
+            background-color: #f8f9fa;
+            white-space: nowrap;  /* Keep headers on one line */
+        }
+
+        /* Column specific widths */
+        .poi-table td:nth-child(1) { width: 12%; }  /* Name */
+        .poi-table td:nth-child(2) { width: 5%; }   /* Rank */
+        .poi-table td:nth-child(3) { width: 8%; }   /* Sub-category */
+        .poi-table td:nth-child(4) { width: 8%; }   /* District */
+        .poi-table td:nth-child(5) { width: 20%; }  /* Description */
+        .poi-table td:nth-child(6) { width: 8%; }   /* Coords */
+        .poi-table td:nth-child(7) { width: 10%; }  /* Address */
+        .poi-table td:nth-child(8) { width: 7%; }   /* Contact */
+        .poi-table td:nth-child(9) { width: 8%; }   /* Hours */
+        .poi-table td:nth-child(10) { width: 7%; }  /* Website */
+        .poi-table td:nth-child(11) { width: 7%; }  /* Created at */
+        
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            border-radius: 0.2rem;
+        }
+        
+        .btn-info {
+            color: #fff;
+            background-color: #17a2b8;
+            border-color: #17a2b8;
+            text-decoration: none;
+        }
+        
+        .btn-info:hover {
+            color: #fff;
+            background-color: #138496;
+            border-color: #117a8b;
+        }
+
+        .empty-cell {
+            background-color: #ffebee;
+        }
+    </style>
+
     <div class="table-responsive">
         <table class="poi-table">
             <thead>
@@ -54,6 +120,7 @@
                             Created at {% if sort_by == 'created_at' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
                     </th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -94,6 +161,9 @@
                             {% endif %}
                         </td>
                         <td {% if not poi.created_at %}class="empty-cell"{% endif %}>{{ poi.created_at|default:"" }}</td>
+                        <td>
+                            <a href="{% url 'poi_history' city.name poi.id %}" class="btn btn-sm btn-info">History</a>
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>

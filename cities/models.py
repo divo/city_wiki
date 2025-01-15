@@ -1,5 +1,7 @@
 from django.db import models
+import reversion
 
+@reversion.register()
 class City(models.Model):
     name = models.CharField(max_length=200, unique=True)
     country = models.CharField(max_length=200)
@@ -7,14 +9,15 @@ class City(models.Model):
     longitude = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         ordering = ['name']
         verbose_name_plural = 'cities'
-    
+
     def __str__(self):
         return f"{self.name}, {self.country}"
 
+@reversion.register()
 class District(models.Model):
     name = models.CharField(max_length=200)
     city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='districts')
@@ -29,6 +32,7 @@ class District(models.Model):
     def __str__(self):
         return f"{self.name} (District of {self.city.name})"
 
+@reversion.register()
 class PointOfInterest(models.Model):
     CATEGORIES = [
         ('see', 'See'),
@@ -38,7 +42,7 @@ class PointOfInterest(models.Model):
         ('drink', 'Drink'),
         ('play', 'Play'),
     ]
-    
+
     # TODO: Need universal ID(s). Probably going to be a mix of (lat,long) and OSM IDs
     city = models.ForeignKey(City, on_delete=models.CASCADE, related_name='points_of_interest')
     district = models.ForeignKey(District, on_delete=models.SET_NULL, null=True, blank=True, related_name='points_of_interest')
