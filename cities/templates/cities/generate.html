@@ -636,6 +636,7 @@ document.getElementById('generateForm').addEventListener('submit', async functio
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken'),
             },
             body: formData
         });
@@ -683,87 +684,58 @@ document.getElementById('generateForm').addEventListener('submit', async functio
                 
                 // Show list view
                 document.getElementById('listView').style.display = 'block';
-                
-                // Update validation information
-                document.getElementById('mentionedPoisCount').textContent = listData._validation.mentioned_pois;
-                document.getElementById('totalPoisCount').textContent = listData._validation.total_pois;
-                document.getElementById('mentionedPois').innerHTML = 
-                    listData._validation.mentioned_poi_names
-                        .map(poi => `<li>${poi}</li>`)
-                        .join('');
-                
-                // Handle missing POIs
-                const missingPoisSection = document.getElementById('missingPoisSection');
-                const missingPoisList = document.getElementById('missingPois');
-                if (listData._validation.missing_pois && listData._validation.missing_pois.length > 0) {
-                    missingPoisList.innerHTML = listData._validation.missing_pois
-                        .map(poi => `<li>${poi}</li>`)
-                        .join('');
-                    missingPoisSection.style.display = 'block';
-                } else {
-                    missingPoisSection.style.display = 'none';
-                }
-                
-                // Update raw JSON
-                document.getElementById('rawJson').textContent = 
-                    JSON.stringify(listData, null, 2);
             } else {
                 // Display the analysis response
-                const analysis = data.analysis;
+                const analysisData = data.analysis;
+                console.log('Analysis data:', analysisData);  // Debug log
                 
                 // Update summary
-                document.getElementById('summary').textContent = analysis.summary;
+                document.getElementById('summary').textContent = analysisData?.summary || '';
                 
                 // Update key findings
                 const keyFindingsList = document.getElementById('keyFindings');
-                keyFindingsList.innerHTML = analysis.key_findings
-                    .map(finding => `<li>${finding}</li>`)
-                    .join('');
+                keyFindingsList.innerHTML = analysisData?.key_findings?.map(finding => `<li>${finding}</li>`)?.join('') || '';
                 
                 // Update category distribution
                 document.getElementById('categoryDescription').textContent = 
-                    analysis.analysis.category_distribution.description;
+                    analysisData?.category_distribution?.description || '';
                 document.getElementById('categoryHighlights').innerHTML = 
-                    analysis.analysis.category_distribution.highlights
-                        .map(highlight => `<li>${highlight}</li>`)
-                        .join('');
+                    analysisData?.category_distribution?.highlights?.map(highlight => `<li>${highlight}</li>`)?.join('') || '';
                 
                 // Update district insights
                 document.getElementById('districtDescription').textContent = 
-                    analysis.analysis.district_insights.description;
+                    analysisData?.district_insights?.description || '';
                 document.getElementById('districtHighlights').innerHTML = 
-                    analysis.analysis.district_insights.highlights
-                        .map(highlight => `<li>${highlight}</li>`)
-                        .join('');
+                    analysisData?.district_insights?.highlights?.map(highlight => `<li>${highlight}</li>`)?.join('') || '';
                 
                 // Update recommendations
                 document.getElementById('recommendations').innerHTML = 
-                    analysis.analysis.recommendations
-                        .map(rec => `
-                            <div class="recommendation-item">
-                                <div class="recommendation-title">${rec.title}</div>
-                                <div>${rec.description}</div>
-                            </div>
-                        `)
-                        .join('');
+                    analysisData?.recommendations?.map(rec => `
+                        <div class="recommendation-item">
+                            <div class="recommendation-title">${rec.title}</div>
+                            <div>${rec.description}</div>
+                        </div>
+                    `)?.join('') || '';
                 
                 // Show analysis view
                 document.getElementById('analysisView').style.display = 'block';
-                
-                // Update validation information
-                document.getElementById('mentionedPoisCount').textContent = analysis._validation.mentioned_pois;
-                document.getElementById('totalPoisCount').textContent = analysis._validation.total_pois;
-                document.getElementById('mentionedPois').innerHTML = 
-                    analysis._validation.mentioned_poi_names
-                        .map(poi => `<li>${poi}</li>`)
-                        .join('');
-                
-                // Update raw JSON
-                document.getElementById('rawJson').textContent = 
-                    JSON.stringify(analysis, null, 2);
             }
             
+            // Update validation information
+            const validation = generationType === 'list' ? data.list?._validation : data.analysis?._validation;
+            if (validation) {
+                document.getElementById('mentionedPoisCount').textContent = validation.mentioned_pois || 0;
+                document.getElementById('totalPoisCount').textContent = validation.total_pois || 0;
+                document.getElementById('mentionedPois').innerHTML = 
+                    validation.mentioned_poi_names?.map(poi => `<li>${poi}</li>`)?.join('') || '';
+            }
+
+            // Show response container
             responseContainer.style.display = 'block';
+            
+            // Update raw JSON
+            document.getElementById('rawJson').textContent = 
+                JSON.stringify(data, null, 2);
         } else {
             throw new Error(data.message || 'Failed to generate content');
         }
@@ -822,6 +794,22 @@ async function createList() {
     } catch (error) {
         alert('Error creating list: ' + error.message);
     }
+}
+
+// Function to get CSRF token from cookies
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 </script>
 {% endblock %} 
