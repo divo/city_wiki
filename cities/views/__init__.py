@@ -8,9 +8,6 @@ from .cities import (
     import_city,
     import_city_data_view,
     check_import_status,
-    fetch_city_image,
-    save_city_image,
-    delete_city_image,
 )
 
 from .lists import (
@@ -25,9 +22,15 @@ from .pois import (
     poi_edit,
     poi_detail,
     poi_merge,
+)
+
+from .images import (
     fetch_poi_image,
     save_poi_image,
     delete_poi_image,
+    fetch_city_image,
+    save_city_image,
+    delete_city_image,
 )
 
 from .views import (
