@@ -8,6 +8,8 @@ class City(models.Model):
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
     image_url = models.URLField(max_length=500, null=True, blank=True, help_text="URL to an image of this city")
+    about = models.TextField(blank=True)  # Store the first 2 paragraphs from WikiVoyage
+    wikivoyage_url = models.URLField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
