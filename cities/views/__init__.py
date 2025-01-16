@@ -33,10 +33,13 @@ from .images import (
     delete_city_image,
 )
 
-from .views import (
+from .generation import (
     generate_text_view,
     generate_text,
     generate_list,
+)
+
+from .views import (
     execute_task,
     check_task_status,
 )
