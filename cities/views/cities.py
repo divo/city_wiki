@@ -208,8 +208,16 @@ def dump_city(request, city_name):
                 'title': poi_list.title,
                 'created_at': poi_list.created_at,
                 'updated_at': poi_list.updated_at,
-                'pois': [poi.name for poi in poi_list.pois.all()]  # Store POI names
+                'pois': []
             }
+            
+            # Add full POI objects to the list
+            for poi in poi_list.pois.all():
+                poi_data = model_to_dict(poi)
+                if poi.district:
+                    poi_data['district'] = poi.district.name
+                list_data['pois'].append(poi_data)
+            
             data['poi_lists'].append(list_data)
 
         return JsonResponse(data, encoder=DjangoJSONEncoder, json_dumps_params={'indent': 2})
