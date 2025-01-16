@@ -29,4 +29,5 @@ urlpatterns = [
     path('city/<str:city_name>/fetch_image/', views.fetch_city_image, name='fetch_city_image'),
     path('city/<str:city_name>/save_image/', views.save_city_image, name='save_city_image'),
     path('city/<str:city_name>/delete_image/', views.delete_city_image, name='delete_city_image'),
+    path('city/<str:city_name>/update_about/', views.update_about, name='update_about'),
 ]

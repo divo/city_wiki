@@ -390,3 +390,25 @@ def delete_city_image(request, city_name):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def update_about(request, city_name):
+    try:
+        city = get_object_or_404(City, name=city_name)
+        data = json.loads(request.body)
+        about_text = data.get('about', '').strip()
+        
+        city.about = about_text
+        city.save()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'About text updated successfully'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=400)

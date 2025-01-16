@@ -130,18 +130,44 @@
         background: white;
         border-radius: 8px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        position: relative;
     }
 
     .city-about h2 {
         color: #2c3e50;
         font-size: 1.5em;
         margin-bottom: 1em;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
     .city-about p {
         color: #34495e;
         line-height: 1.6;
         margin-bottom: 0;
+    }
+
+    .city-about textarea {
+        width: 100%;
+        min-height: 150px;
+        padding: 0.5em;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: 1.6;
+        margin-bottom: 1em;
+    }
+
+    .edit-buttons {
+        display: none;
+        gap: 0.5em;
+        margin-top: 1em;
+    }
+
+    .edit-buttons.active {
+        display: flex;
     }
 </style>
 
@@ -154,12 +180,22 @@
             <button onclick="deleteCity('{{ city.name }}')" class="delete-btn">Delete City</button>
         </div>
         
-        {% if city.about %}
         <div class="city-about">
-            <h2>About</h2>
-            <p>{{ city.about|linebreaksbr }}</p>
+            <h2>
+                About
+                <button class="btn btn-sm btn-outline-primary" onclick="toggleEditAbout()">Edit</button>
+            </h2>
+            <div id="aboutDisplay">
+                <p>{{ city.about|default:"No description available"|linebreaksbr }}</p>
+            </div>
+            <div id="aboutEdit" style="display: none;">
+                <textarea id="aboutText">{{ city.about }}</textarea>
+                <div class="edit-buttons" id="editButtons">
+                    <button class="btn btn-primary" onclick="saveAbout()">Save</button>
+                    <button class="btn btn-secondary" onclick="cancelEdit()">Cancel</button>
+                </div>
+            </div>
         </div>
-        {% endif %}
         
         <div class="city-image-container">
             {% if city.image_url %}
@@ -547,5 +583,53 @@ document.getElementById('imageModal').addEventListener('click', function(e) {
         closeImageModal();
     }
 });
+
+function toggleEditAbout() {
+    const displayDiv = document.getElementById('aboutDisplay');
+    const editDiv = document.getElementById('aboutEdit');
+    const editButtons = document.getElementById('editButtons');
+    
+    displayDiv.style.display = 'none';
+    editDiv.style.display = 'block';
+    editButtons.classList.add('active');
+}
+
+function cancelEdit() {
+    const displayDiv = document.getElementById('aboutDisplay');
+    const editDiv = document.getElementById('aboutEdit');
+    const editButtons = document.getElementById('editButtons');
+    
+    displayDiv.style.display = 'block';
+    editDiv.style.display = 'none';
+    editButtons.classList.remove('active');
+}
+
+async function saveAbout() {
+    const newText = document.getElementById('aboutText').value;
+    
+    try {
+        const response = await fetch(`/city/{{ city.name }}/update_about/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                about: newText
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            document.querySelector('#aboutDisplay p').innerHTML = newText.replace(/\n/g, '<br>');
+            cancelEdit();
+        } else {
+            alert('Error saving about text: ' + data.message);
+        }
+    } catch (error) {
+        alert('Error saving about text: ' + error);
+    }
+}
 </script>
 {% endblock %}
