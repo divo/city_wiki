@@ -250,12 +250,6 @@ def poi_merge(request, city_name):
             'message': str(e)
         }, status=500)
 
-
-
-
-
-
-
 @csrf_exempt
 @require_http_methods(["POST"])
 def fetch_poi_image(request, city_name, poi_id):
