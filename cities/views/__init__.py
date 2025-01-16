@@ -1,4 +1,4 @@
-from .views import (
+from .cities import (
     city_list,
     city_detail,
     city_map,
@@ -8,6 +8,9 @@ from .views import (
     import_city,
     import_city_data_view,
     check_import_status,
+)
+
+from .views import (
     generate_text_view,
     generate_text,
     generate_list,
@@ -27,4 +30,4 @@ from .views import (
     delete_poi_image,
     save_city_image,
     delete_city_image,
-) 
+)
