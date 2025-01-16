@@ -127,12 +127,12 @@
 
 <div class="container">
     <div class="city-header">
-        <h1>{{ city.name }}, {{ city.country }}</h1>
+        <h1>{{ city.name }}</h1>
         <p>Last updated: {{ city.updated_at|date:"F j, Y" }}</p>
         <div class="actions">
             <a href="{% url 'city_list' %}" class="back-link">← Back to Cities</a>
             <button onclick="deleteCity('{{ city.name }}')" class="delete-btn">Delete City</button>
-        <h1>{{ city.name }}</h1>
+        </div>
         
         <div class="city-image-container">
             {% if city.image_url %}
