@@ -15,6 +15,14 @@ from celery.result import AsyncResult
 import logging
 logger = logging.getLogger(__name__)
 
+ENRICHMENT_TASKS = [
+    ('normalize_categories', 'Normalize Categories'),
+    ('geocode_addresses', 'Geocode Missing Addresses'),
+    ('dedup_main_city', 'Merge Duplicates in Main City'),
+    ('find_all_duplicates', 'Find All Duplicates'),
+    # Add more tasks here as they're implemented
+]
+
 
 def city_list(request):
     cities = City.objects.all()
@@ -307,3 +315,78 @@ def city_map(request, city_name):
         'districts': districts,
         'selected_district': district_id,
     })
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def fetch_city_image(request, city_name):
+    """Fetch image URLs for a city without saving any."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+
+        search_query = f"{city.name} city skyline"
+        wikimedia_result = _fetch_wikimedia_images(search_query)
+        pixabay_result = _fetch_pixabay_images(search_query)
+
+        result = _combine_image_results(wikimedia_result, pixabay_result)
+        return JsonResponse(result, status=404 if result['status'] == 'error' else 200)
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def save_city_image(request, city_name):
+    """Save a specific image URL for a city."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+
+        data = json.loads(request.body)
+        image_url = data.get('image_url')
+
+        if not image_url:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Image URL is required'
+            }, status=400)
+
+        # Save the image URL
+        city.image_url = image_url
+        city.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Image URL saved'
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def delete_city_image(request, city_name):
+    """Delete the image URL from a city."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+
+        # Clear the image URL
+        city.image_url = None
+        city.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Image URL removed'
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)

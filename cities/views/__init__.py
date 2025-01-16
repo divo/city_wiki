@@ -8,6 +8,9 @@ from .cities import (
     import_city,
     import_city_data_view,
     check_import_status,
+    fetch_city_image,
+    save_city_image,
+    delete_city_image,
 )
 
 from .pois import (
@@ -30,7 +33,4 @@ from .views import (
     generate_list,
     execute_task,
     check_task_status,
-    fetch_city_image,
-    save_city_image,
-    delete_city_image,
 )
