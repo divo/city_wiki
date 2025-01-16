@@ -13,7 +13,7 @@ from django.db.models import Count
 import json
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
-from .. import generation
+from . import generation
 import reversion
 from reversion.models import Version
 from .. import enrich_tasks
