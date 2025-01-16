@@ -4,18 +4,19 @@ import reversion
 @reversion.register()
 class City(models.Model):
     name = models.CharField(max_length=200, unique=True)
-    country = models.CharField(max_length=200)
+    country = models.CharField(max_length=200, default='Unknown')
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
+    image_url = models.URLField(max_length=500, null=True, blank=True, help_text="URL to an image of this city")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        verbose_name_plural = "cities"
         ordering = ['name']
-        verbose_name_plural = 'cities'
 
     def __str__(self):
-        return f"{self.name}, {self.country}"
+        return self.name
 
 @reversion.register()
 class District(models.Model):

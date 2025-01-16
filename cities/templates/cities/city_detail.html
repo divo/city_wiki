@@ -54,6 +54,75 @@
         width: 100%;
         margin-bottom: 2em;
     }
+
+    .city-header {
+        margin-bottom: 2em;
+        padding: 2em;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
+    .city-image-container {
+        margin-bottom: 1em;
+        text-align: center;
+    }
+    .city-image {
+        max-width: 100%;
+        max-height: 400px;
+        object-fit: cover;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+    .city-image.selectable:hover {
+        border: 2px solid #007bff;
+    }
+    .image-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        justify-content: center;
+    }
+    .image-actions {
+        margin-bottom: 1em;
+    }
+    .delete-image-btn {
+        background: #dc3545;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .delete-image-btn:hover {
+        background: #c82333;
+    }
+    .image-modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.9);
+    }
+    .image-modal img {
+        max-width: 90%;
+        max-height: 90vh;
+        margin: auto;
+        display: block;
+        position: relative;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+    .image-modal .close {
+        position: absolute;
+        right: 20px;
+        top: 20px;
+        color: white;
+        font-size: 30px;
+        cursor: pointer;
+    }
 </style>
 
 <div class="container">
@@ -63,6 +132,15 @@
         <div class="actions">
             <a href="{% url 'city_list' %}" class="back-link">← Back to Cities</a>
             <button onclick="deleteCity('{{ city.name }}')" class="delete-btn">Delete City</button>
+        <h1>{{ city.name }}</h1>
+        
+        <div class="city-image-container">
+            {% if city.image_url %}
+                <img src="{{ city.image_url }}" alt="{{ city.name }}" class="city-image" onclick="showImageModal(this.src)">
+                <button class="btn btn-danger" onclick="deleteImage()">Delete Image</button>
+            {% else %}
+                <button class="btn btn-primary" onclick="fetchImages()">Find City Image</button>
+            {% endif %}
         </div>
         
         <div class="filters">
@@ -88,6 +166,10 @@
                     {% endfor %}
                 </select>
             </form>
+        <div class="city-stats">
+            <p>Country: {{ city.country }}</p>
+            <p>Districts: {{ city.districts.count }}</p>
+            <p>Points of Interest: {{ city.points_of_interest.count }}</p>
         </div>
     </div>
 
@@ -166,6 +248,12 @@
             {% include "cities/poi_table.html" with pois=pois %}
         </section>
     {% endfor %}
+</div>
+
+<!-- Image Modal -->
+<div id="imageModal" class="image-modal">
+    <span class="close" onclick="closeImageModal()">&times;</span>
+    <img id="modalImage" src="" alt="Full size image">
 </div>
 
 <script>
@@ -322,5 +410,115 @@ function resetUI() {
     document.getElementById('taskSelect').disabled = false;
     currentTaskId = null;
 }
+
+async function fetchImages() {
+    const container = document.querySelector('.city-image-container');
+    const button = container.querySelector('button');
+    button.disabled = true;
+    button.textContent = 'Searching...';
+    
+    try {
+        const response = await fetch(`/city/{{ city.name }}/fetch_image/`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const grid = document.createElement('div');
+            grid.className = 'image-grid';
+            
+            data.image_urls.forEach(imageUrl => {
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.className = 'city-image selectable';
+                img.alt = '{{ city.name }}';
+                img.onclick = () => selectImage(imageUrl);
+                grid.appendChild(img);
+            });
+            
+            container.innerHTML = '';
+            container.appendChild(grid);
+        } else {
+            button.textContent = 'No Images Found';
+            button.disabled = false;
+        }
+    } catch (error) {
+        console.error('Error fetching images:', error);
+        button.textContent = 'Error';
+        button.disabled = false;
+    }
+}
+
+async function selectImage(imageUrl) {
+    try {
+        const response = await fetch(`/city/{{ city.name }}/save_image/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                image_url: imageUrl
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const container = document.querySelector('.city-image-container');
+            container.innerHTML = `
+                <img src="${imageUrl}" alt="{{ city.name }}" class="city-image" onclick="showImageModal(this.src)">
+                <button class="btn btn-danger" onclick="deleteImage()">Delete Image</button>
+            `;
+        } else {
+            alert('Error saving image: ' + data.message);
+        }
+    } catch (error) {
+        alert('Error saving image: ' + error);
+    }
+}
+
+async function deleteImage() {
+    if (confirm('Are you sure you want to delete this image?')) {
+        try {
+            const response = await fetch(`/city/{{ city.name }}/delete_image/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                const container = document.querySelector('.city-image-container');
+                container.innerHTML = '<button class="btn btn-primary" onclick="fetchImages()">Find City Image</button>';
+            } else {
+                alert('Error deleting image: ' + data.message);
+            }
+        } catch (error) {
+            alert('Error deleting image: ' + error);
+        }
+    }
+}
+
+function showImageModal(src) {
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('modalImage');
+    modal.style.display = 'block';
+    modalImg.src = src;
+}
+
+function closeImageModal() {
+    const modal = document.getElementById('imageModal');
+    modal.style.display = 'none';
+}
+
+document.getElementById('imageModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeImageModal();
+    }
+});
 </script>
 {% endblock %}
