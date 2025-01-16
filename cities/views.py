@@ -735,6 +735,86 @@ def _fetch_wikimedia_images(search_query, limit=10):
             'message': str(e)
         }
 
+def _fetch_pixabay_images(search_query, limit=10):
+    """Helper function to fetch images from Pixabay."""
+    try:
+        import requests
+        import os
+        
+        logger.info(f"Fetching Pixabay images for query: {search_query}")
+        
+        # TODO: Get this from the environment variables, rotate all keys
+        api_key = '48260974-6b7ee5fa9113ac3f114f83ece'
+        if not api_key:
+            logger.error("Pixabay API key not found in environment variables")
+            return {
+                'status': 'error',
+                'message': 'Pixabay API key not configured'
+            }
+        
+        # Format search query
+        search_query = search_query.replace(' ', '+')
+        api_url = f"https://pixabay.com/api/?key={api_key}&q={search_query}&image_type=photo&per_page={limit}"
+        logger.info(f"Making request to Pixabay API: {api_url.replace(api_key, '[REDACTED]')}")
+        
+        response = requests.get(api_url)
+        logger.info(f"Pixabay API response status code: {response.status_code}")
+        
+        if response.status_code != 200:
+            logger.error(f"Pixabay API error: {response.text}")
+            return {
+                'status': 'error',
+                'message': f'Pixabay API error: {response.status_code}'
+            }
+        
+        data = response.json()
+        logger.info(f"Pixabay API response: {data.get('total', 0)} total hits")
+        
+        image_urls = []
+        if data.get('hits'):
+            for hit in data['hits']:
+                image_urls.append(hit['largeImageURL'])
+            
+            if image_urls:
+                logger.info(f"Found {len(image_urls)} images from Pixabay")
+                return {
+                    'status': 'success',
+                    'message': 'Image URLs found',
+                    'image_urls': image_urls
+                }
+        
+        logger.warning("No images found in Pixabay response")
+        return {
+            'status': 'error',
+            'message': 'No suitable images found'
+        }
+        
+    except Exception as e:
+        logger.exception(f"Error fetching images from Pixabay: {str(e)}")
+        return {
+            'status': 'error',
+            'message': str(e)
+        }
+
+def _combine_image_results(*results):
+    """Helper function to combine image results from multiple sources."""
+    combined_urls = []
+    for result in results:
+        if result.get('status') == 'success':
+            combined_urls.extend(result.get('image_urls', []))
+    
+    if combined_urls:
+        return {
+            'status': 'success',
+            'message': 'Image URLs found',
+            'image_urls': combined_urls[:20]  # Limit total results
+        }
+    
+    return {
+        'status': 'error',
+        'message': 'No suitable images found'
+    }
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def fetch_poi_image(request, city_name, poi_id):
@@ -743,7 +823,12 @@ def fetch_poi_image(request, city_name, poi_id):
         city = get_object_or_404(City, name=city_name)
         poi = get_object_or_404(PointOfInterest, id=poi_id, city=city)
         
-        result = _fetch_wikimedia_images(poi.name)
+        # Get images from both sources
+        wikimedia_result = _fetch_wikimedia_images(poi.name)
+        pixabay_result = _fetch_pixabay_images(poi.name)
+        
+        # Combine results
+        result = _combine_image_results(wikimedia_result, pixabay_result)
         return JsonResponse(result, status=404 if result['status'] == 'error' else 200)
         
     except Exception as e:
@@ -760,7 +845,10 @@ def fetch_city_image(request, city_name):
         city = get_object_or_404(City, name=city_name)
         
         search_query = f"{city.name} city skyline"
-        result = _fetch_wikimedia_images(search_query)
+        wikimedia_result = _fetch_wikimedia_images(search_query)
+        pixabay_result = _fetch_pixabay_images(search_query)
+
+        result = _combine_image_results(wikimedia_result, pixabay_result)
         return JsonResponse(result, status=404 if result['status'] == 'error' else 200)
         
     except Exception as e:
