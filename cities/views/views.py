@@ -3,9 +3,9 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from data_processing.wikivoyage_scraper import WikivoyageScraper
-from .models import PointOfInterest, City, District, PoiList
+from ..models import PointOfInterest, City, District, PoiList
 from django.db import transaction, models
-from .fetch_tasks import import_city_data
+from ..fetch_tasks import import_city_data
 from celery.result import AsyncResult
 from django.contrib import messages
 import logging
@@ -13,10 +13,10 @@ from django.db.models import Count
 import json
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
-from . import generation
+from .. import generation
 import reversion
 from reversion.models import Version
-from . import enrich_tasks
+from .. import enrich_tasks
 
 logger = logging.getLogger(__name__)
 
