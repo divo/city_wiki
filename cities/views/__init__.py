@@ -10,10 +10,7 @@ from .cities import (
     check_import_status,
 )
 
-from .views import (
-    generate_text_view,
-    generate_text,
-    generate_list,
+from .pois import (
     poi_history,
     poi_revert,
     poi_edit,
@@ -22,12 +19,18 @@ from .views import (
     poi_lists,
     create_poi_list,
     delete_poi_list,
-    execute_task,
-    check_task_status,
     fetch_poi_image,
-    fetch_city_image,
     save_poi_image,
     delete_poi_image,
+)
+
+from .views import (
+    generate_text_view,
+    generate_text,
+    generate_list,
+    execute_task,
+    check_task_status,
+    fetch_city_image,
     save_city_image,
     delete_city_image,
 )
