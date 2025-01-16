@@ -184,7 +184,8 @@ def dump_city(request, city_name):
         data = {
             'city': model_to_dict(city, exclude=['id']),
             'districts': [],
-            'points_of_interest': []
+            'points_of_interest': [],
+            'poi_lists': []  # Add new section for POI lists
         }
 
         # Add districts
@@ -200,6 +201,16 @@ def dump_city(request, city_name):
             if poi.district:
                 poi_data['district'] = poi.district.name
             data['points_of_interest'].append(poi_data)
+
+        # Add POI lists
+        for poi_list in city.poi_lists.all():
+            list_data = {
+                'title': poi_list.title,
+                'created_at': poi_list.created_at,
+                'updated_at': poi_list.updated_at,
+                'pois': [poi.name for poi in poi_list.pois.all()]  # Store POI names
+            }
+            data['poi_lists'].append(list_data)
 
         return JsonResponse(data, encoder=DjangoJSONEncoder, json_dumps_params={'indent': 2})
 
