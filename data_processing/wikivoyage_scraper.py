@@ -38,9 +38,9 @@ class WikivoyageScraper:
     # from data_processing.wikivoyage_scraper import WikivoyageScraper
     # scraper = WikivoyageScraper()
     # pois = scraper.get_city_data("Paris")
-    def get_city_data(self, city_name: str) -> tuple[List[PointOfInterest], List[str]]:
+    def get_city_data(self, city_name: str) -> tuple[List[PointOfInterest], List[str], str]:
         """
-        Returns a tuple of (points_of_interest, district_pages)
+        Returns a tuple of (points_of_interest, district_pages, about_text)
         """
         response = self.session.get(
             action='parse',
@@ -58,6 +58,22 @@ class WikivoyageScraper:
         poi_dict = {}  # key: name -> value: POI
         district_pages = set()  # Use a set to automatically deduplicate
         
+        # Extract the first two paragraphs of text
+        about_text = ""
+        paragraphs = []
+        for section in parsed.sections:
+            if not section.title:  # This is the lead section
+                # Split into paragraphs and clean them
+                text = section.string
+                for template in section.templates:
+                    text = text.replace(str(template), '')  # Remove templates
+                clean_paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+                paragraphs.extend(clean_paragraphs[:2])  # Take first two paragraphs
+                break
+        
+        if paragraphs:
+            about_text = '\n\n'.join(self._clean_text(p) for p in paragraphs)
+        
         for section in parsed.sections:
             if section.title == "Districts":
                 for wikilink in section.wikilinks:
@@ -67,7 +83,7 @@ class WikivoyageScraper:
                 if category:
                     self._parse_section(section, category, poi_dict)
         
-        return list(poi_dict.values()), list(district_pages)  # Convert back to list before returning
+        return list(poi_dict.values()), list(district_pages), about_text  # Convert back to list before returning
     
     def _determine_category(self, title: str) -> Optional[str]:
         if not title:

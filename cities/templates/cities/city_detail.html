@@ -123,6 +123,26 @@
         font-size: 30px;
         cursor: pointer;
     }
+
+    .city-about {
+        margin: 2em 0;
+        padding: 1.5em;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .city-about h2 {
+        color: #2c3e50;
+        font-size: 1.5em;
+        margin-bottom: 1em;
+    }
+
+    .city-about p {
+        color: #34495e;
+        line-height: 1.6;
+        margin-bottom: 0;
+    }
 </style>
 
 <div class="container">
@@ -133,6 +153,13 @@
             <a href="{% url 'city_list' %}" class="back-link">← Back to Cities</a>
             <button onclick="deleteCity('{{ city.name }}')" class="delete-btn">Delete City</button>
         </div>
+        
+        {% if city.about %}
+        <div class="city-about">
+            <h2>About</h2>
+            <p>{{ city.about|linebreaksbr }}</p>
+        </div>
+        {% endif %}
         
         <div class="city-image-container">
             {% if city.image_url %}

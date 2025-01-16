@@ -28,7 +28,7 @@ def _fetch_pois(city_name, depth):
             specialized_aggregate='DistrictFetchError' if depth != 0 else 'CityFetchError',
             description=str(response_error)
         )
-        return None, None
+        return None, None, None
 
 
 @shared_task(bind=True)
@@ -46,7 +46,7 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
     """
     logger.info(f"Starting import task for {city_name} (depth: {current_depth}/{max_depth})")
     try:
-        pois, district_pages = _fetch_pois(city_name, current_depth)
+        pois, district_pages, about_text = _fetch_pois(city_name, current_depth)
 
         if pois == None:
             logger.error(f"Error fetching POIs for {city_name}")
@@ -70,6 +70,12 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
                 name=root_city_name,
                 defaults={'country': 'Unknown'}
             )
+            
+            # Save about text only for the root city on first import
+            if not parent_task_id and about_text:
+                city.about = about_text
+                city.save()
+                logger.info(f"Saved about text for {city_name}")
             
             # Create/update district if this is a district page
             current_district = None
