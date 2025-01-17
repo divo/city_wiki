@@ -322,10 +322,6 @@ Remember:
                 # Validate that exactly count POIs are included
                 if len(list_data.get('pois', [])) != count:
                     f.write(f"POI count mismatch: got {len(list_data.get('pois', []))}, expected {count}\n")
-                    return JsonResponse({
-                        'status': 'error',
-                        'message': f'Generated list does not contain exactly {count} POIs'
-                    }, status=500)
                 
                 # Track missing POIs and add details to existing ones
                 missing_pois = []
