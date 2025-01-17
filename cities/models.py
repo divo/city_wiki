@@ -3,6 +3,7 @@ import os
 from django.forms import model_to_dict
 from reversion.models import Version
 import reversion
+from django.conf import settings
 
 def city_image_path(instance, filename):
     """Generate file path for city images."""
@@ -54,7 +55,7 @@ class City(models.Model):
     def image_url(self):
         """Return the URL for the image file if it exists."""
         if self.image_file:
-            return f'http://localhost:8000{self.image_file.url}'
+            return f'{settings.BASE_URL}{self.image_file.url}'
         return None
 
     def to_dict(self):
@@ -129,7 +130,7 @@ class PointOfInterest(models.Model):
     def image_url(self):
         """Return the URL for the image file if it exists."""
         if self.image_file:
-            return f'http://localhost:8000{self.image_file.url}'
+            return f'{settings.BASE_URL}{self.image_file.url}'
         return None
 
     def to_dict(self):
