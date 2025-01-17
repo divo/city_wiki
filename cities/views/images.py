@@ -139,6 +139,40 @@ def _combine_image_results(*results):
         'message': 'No suitable images found'
     }
 
+def _download_image(image_url):
+    """Helper function to download an image with proper error handling."""
+    try:
+        logger.info(f"Attempting to download image from: {image_url}")
+        
+        # Add headers to mimic a browser request
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(image_url, headers=headers, timeout=10)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        
+        # Check if the response is actually an image
+        content_type = response.headers.get('content-type', '')
+        if not content_type.startswith('image/'):
+            logger.error(f"Invalid content type: {content_type}")
+            return None, f"Invalid content type: {content_type}"
+            
+        return response.content, None
+        
+    except requests.exceptions.Timeout:
+        logger.error("Request timed out while downloading image")
+        return None, "Request timed out"
+    except requests.exceptions.TooManyRedirects:
+        logger.error("Too many redirects while downloading image")
+        return None, "Too many redirects"
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error downloading image: {str(e)}")
+        return None, str(e)
+    except Exception as e:
+        logger.error(f"Unexpected error downloading image: {str(e)}")
+        return None, str(e)
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def fetch_poi_image(request, city_name, poi_id):
@@ -192,11 +226,13 @@ def save_city_image(request, city_name):
         
         if not image_url:
             return JsonResponse({'status': 'error', 'message': 'No image URL provided'}, status=400)
+        
+        logger.info(f"Attempting to save image for city {city_name} from URL: {image_url}")
             
         # Download the image
-        response = requests.get(image_url)
-        if response.status_code != 200:
-            return JsonResponse({'status': 'error', 'message': 'Failed to download image'}, status=400)
+        image_content, error = _download_image(image_url)
+        if error:
+            return JsonResponse({'status': 'error', 'message': f'Failed to download image: {error}'}, status=400)
             
         # Get the file extension from the URL
         parsed_url = urlparse(image_url)
@@ -206,15 +242,18 @@ def save_city_image(request, city_name):
             
         # Create a temporary file
         img_temp = NamedTemporaryFile(delete=True)
-        img_temp.write(response.content)
+        img_temp.write(image_content)
         img_temp.flush()
         
         # Delete old image file if it exists
         if city.image_file:
+            logger.info(f"Deleting old image file for city {city_name}")
             city.delete_image_file()
             
         # Save the new image
-        city.image_file.save(f"{city.name}{ext}", File(img_temp), save=True)
+        filename = f"{city.name}{ext}"
+        logger.info(f"Saving new image file for city {city_name}: {filename}")
+        city.image_file.save(filename, File(img_temp), save=True)
         
         return JsonResponse({
             'status': 'success', 
@@ -223,6 +262,7 @@ def save_city_image(request, city_name):
         })
         
     except json.JSONDecodeError:
+        logger.error("Invalid JSON data in request")
         return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
     except Exception as e:
         logger.error(f"Error saving city image: {str(e)}")
@@ -242,10 +282,12 @@ def save_poi_image(request, city_name, poi_id):
         if not image_url:
             return JsonResponse({'status': 'error', 'message': 'No image URL provided'}, status=400)
             
+        logger.info(f"Attempting to save image for POI {poi.name} from URL: {image_url}")
+            
         # Download the image
-        response = requests.get(image_url)
-        if response.status_code != 200:
-            return JsonResponse({'status': 'error', 'message': 'Failed to download image'}, status=400)
+        image_content, error = _download_image(image_url)
+        if error:
+            return JsonResponse({'status': 'error', 'message': f'Failed to download image: {error}'}, status=400)
             
         # Get the file extension from the URL
         parsed_url = urlparse(image_url)
@@ -255,15 +297,18 @@ def save_poi_image(request, city_name, poi_id):
             
         # Create a temporary file
         img_temp = NamedTemporaryFile(delete=True)
-        img_temp.write(response.content)
+        img_temp.write(image_content)
         img_temp.flush()
         
         # Delete old image file if it exists
         if poi.image_file:
+            logger.info(f"Deleting old image file for POI {poi.name}")
             poi.delete_image_file()
             
         # Save the new image
-        poi.image_file.save(f"{poi.name}{ext}", File(img_temp), save=True)
+        filename = f"{poi.name}{ext}"
+        logger.info(f"Saving new image file for POI {poi.name}: {filename}")
+        poi.image_file.save(filename, File(img_temp), save=True)
         
         return JsonResponse({
             'status': 'success', 
@@ -272,6 +317,7 @@ def save_poi_image(request, city_name, poi_id):
         })
         
     except json.JSONDecodeError:
+        logger.error("Invalid JSON data in request")
         return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
     except Exception as e:
         logger.error(f"Error saving POI image: {str(e)}")
