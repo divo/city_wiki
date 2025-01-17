@@ -84,3 +84,37 @@ def delete_poi_list(request, city_name, list_id):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def append_to_list(request, city_name, list_id):
+    """Append POIs to an existing list."""
+    try:
+        data = json.loads(request.body)
+        poi_ids = data.get('poi_ids', [])
+
+        if not poi_ids:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'At least one POI must be selected'
+            }, status=400)
+
+        city = get_object_or_404(City, name=city_name)
+        poi_list = get_object_or_404(PoiList, id=list_id, city=city)
+
+        # Add POIs to the list
+        pois = PointOfInterest.objects.filter(id__in=poi_ids, city=city)
+        poi_list.pois.add(*pois)
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'POIs added to list successfully'
+        })
+
+    except Exception as e:
+        logger.error(f"Error appending to list: {str(e)}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
