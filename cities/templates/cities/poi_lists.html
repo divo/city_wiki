@@ -204,15 +204,25 @@
                                     <td>{{ poi.get_category_display }}</td>
                                     <td>{{ poi.district.name|default:"Main City" }}</td>
                                     <td>
-                                        <button class="btn btn-sm btn-primary fetch-image-btn" 
-                                                data-poi-id="{{ poi.id }}"
-                                                {% if poi.image_url %}disabled{% endif %}>
-                                            {% if poi.image_url %}
+                                        {% if not poi.image_url %}
+                                            <div style="display: flex; gap: 10px; align-items: center;">
+                                                <input type="text" 
+                                                       class="search-query form-control form-control-sm" 
+                                                       placeholder="Search query..."
+                                                       value="{{ poi.name }}"
+                                                       style="width: 200px;">
+                                                <button class="btn btn-sm btn-primary fetch-image-btn" 
+                                                        data-poi-id="{{ poi.id }}">
+                                                    Fetch Images
+                                                </button>
+                                            </div>
+                                        {% else %}
+                                            <button class="btn btn-sm btn-primary fetch-image-btn" 
+                                                    data-poi-id="{{ poi.id }}"
+                                                    disabled>
                                                 Image Found
-                                            {% else %}
-                                                Fetch Images
-                                            {% endif %}
-                                        </button>
+                                            </button>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -262,12 +272,22 @@ document.querySelectorAll('.fetch-image-btn').forEach(button => {
     button.addEventListener('click', async function() {
         const poiId = this.dataset.poiId;
         const row = this.closest('tr');
+        const searchInput = row.querySelector('.search-query');
+        const searchQuery = searchInput ? searchInput.value : null;
+        
         this.disabled = true;
         this.textContent = 'Fetching...';
         
         try {
             const response = await fetch(`/city/{{ city.name }}/poi/${poiId}/fetch_image/`, {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    search_query: searchQuery
+                })
             });
             
             const data = await response.json();
@@ -408,5 +428,85 @@ document.getElementById('imageModal').addEventListener('click', function(e) {
         closeImageModal();
     }
 });
+
+async function fetchImages(poiId, searchContainer) {
+    const button = searchContainer.querySelector('button');
+    const searchInput = searchContainer.querySelector('.search-query');
+    const searchQuery = searchInput ? searchInput.value : null;
+    
+    button.disabled = true;
+    button.textContent = 'Searching...';
+    
+    try {
+        const response = await fetch('/city/{{ city.name }}/poi/' + poiId + '/fetch_image/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                search_query: searchQuery
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const imagesGrid = document.createElement('div');
+            imagesGrid.className = 'image-results';
+            
+            // Keep the search controls at the top
+            const searchControls = document.createElement('div');
+            searchControls.className = 'search-controls';
+            searchControls.innerHTML = 
+                '<input type="text" ' +
+                '       class="search-query form-control" ' +
+                '       value="' + (searchQuery || '') + '" ' +
+                '       placeholder="Search for images (e.g. ' + searchQuery + ')" ' +
+                '       style="margin-bottom: 10px;">' +
+                '<button onclick="fetchImages(' + poiId + ', this.parentElement)" class="btn btn-primary">Search Again</button>';
+            
+            // Add image results
+            data.image_urls.forEach(imageUrl => {
+                const imgContainer = document.createElement('div');
+                imgContainer.className = 'image-result';
+                
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.className = 'poi-image selectable';
+                img.onclick = () => selectImage(imageUrl, poiId, searchContainer.closest('.poi-images-grid'), button);
+                
+                imgContainer.appendChild(img);
+                imagesGrid.appendChild(imgContainer);
+            });
+            
+            // Replace the content
+            const poiImagesGrid = searchContainer.closest('.poi-images-grid');
+            poiImagesGrid.innerHTML = '';
+            poiImagesGrid.appendChild(searchControls);
+            poiImagesGrid.appendChild(imagesGrid);
+        } else {
+            // Show error and keep search controls
+            const searchControls = document.createElement('div');
+            searchControls.className = 'search-controls';
+            searchControls.innerHTML = 
+                '<input type="text" ' +
+                '       class="search-query form-control" ' +
+                '       value="' + (searchQuery || '') + '" ' +
+                '       placeholder="Search for images (e.g. ' + searchQuery + ')" ' +
+                '       style="margin-bottom: 10px;">' +
+                '<button onclick="fetchImages(' + poiId + ', this.parentElement)" class="btn btn-primary">Try Again</button>' +
+                '<p class="text-danger mt-2">No images found. Try a different search query.</p>';
+            
+            const poiImagesGrid = searchContainer.closest('.poi-images-grid');
+            poiImagesGrid.innerHTML = '';
+            poiImagesGrid.appendChild(searchControls);
+        }
+    } catch (error) {
+        console.error('Error fetching images:', error);
+        button.textContent = 'Error';
+        button.disabled = false;
+    }
+}
 </script>
 {% endblock %} 

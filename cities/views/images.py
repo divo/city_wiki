@@ -181,9 +181,18 @@ def fetch_poi_image(request, city_name, poi_id):
         city = get_object_or_404(City, name=city_name)
         poi = get_object_or_404(PointOfInterest, id=poi_id, city=city)
         
+        # Get custom search query from request body if provided
+        try:
+            data = json.loads(request.body)
+            search_query = data.get('search_query', poi.name)
+        except json.JSONDecodeError:
+            search_query = poi.name  # Default if no query provided
+            
+        logger.info(f"Fetching images for POI {poi.name} with query: {search_query}")
+        
         # Get images from both sources
-        wikimedia_result = _fetch_wikimedia_images(poi.name)
-        pixabay_result = _fetch_pixabay_images(poi.name)
+        wikimedia_result = _fetch_wikimedia_images(search_query)
+        pixabay_result = _fetch_pixabay_images(search_query)
         
         # Combine results
         result = _combine_image_results(wikimedia_result, pixabay_result)
