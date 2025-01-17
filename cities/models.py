@@ -1,5 +1,25 @@
 from django.db import models
 import reversion
+import os
+
+def city_image_path(instance, filename):
+    """Generate file path for city images."""
+    # Get the file extension
+    ext = filename.split('.')[-1]
+    # Create a clean filename using the city name
+    clean_name = instance.name.replace(' ', '_').lower()
+    # Return the complete path
+    return f'cities/images/{clean_name}.{ext}'
+
+def poi_image_path(instance, filename):
+    """Generate file path for POI images."""
+    # Get the file extension
+    ext = filename.split('.')[-1]
+    # Create a clean filename using the POI name and city
+    clean_name = instance.name.replace(' ', '_').lower()
+    clean_city = instance.city.name.replace(' ', '_').lower()
+    # Return the complete path
+    return f'cities/images/pois/{clean_city}/{clean_name}.{ext}'
 
 @reversion.register()
 class City(models.Model):
@@ -7,7 +27,7 @@ class City(models.Model):
     country = models.CharField(max_length=200, default='Unknown')
     latitude = models.FloatField(null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
-    image_url = models.URLField(max_length=500, null=True, blank=True, help_text="URL to an image of this city")
+    image_file = models.ImageField(upload_to=city_image_path, null=True, blank=True, help_text="Stored image file of this city")
     about = models.TextField(blank=True)  # Store the first 2 paragraphs from WikiVoyage
     wikivoyage_url = models.URLField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -19,6 +39,21 @@ class City(models.Model):
 
     def __str__(self):
         return self.name
+
+    def delete_image_file(self):
+        """Delete the image file if it exists."""
+        if self.image_file:
+            if os.path.isfile(self.image_file.path):
+                os.remove(self.image_file.path)
+            self.image_file = None
+            self.save()
+
+    @property
+    def image_url(self):
+        """Return the URL for the image file if it exists."""
+        if self.image_file:
+            return self.image_file.url
+        return None
 
 @reversion.register()
 class District(models.Model):
@@ -59,8 +94,8 @@ class PointOfInterest(models.Model):
     phone = models.CharField(max_length=50, null=True, blank=True)
     website = models.URLField(max_length=500, null=True, blank=True)
     hours = models.CharField(max_length=500, null=True, blank=True)
+    image_file = models.ImageField(upload_to=poi_image_path, null=True, blank=True, help_text="Stored image file of this POI")
     rank = models.IntegerField(default=0)
-    image_url = models.URLField(max_length=500, null=True, blank=True, help_text="URL to an image of this POI")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -70,6 +105,24 @@ class PointOfInterest(models.Model):
             models.Index(fields=['city', 'category']),
             models.Index(fields=['district', 'category']),
         ]
+
+    def __str__(self):
+        return f"{self.name} ({self.city.name})"
+
+    def delete_image_file(self):
+        """Delete the image file if it exists."""
+        if self.image_file:
+            if os.path.isfile(self.image_file.path):
+                os.remove(self.image_file.path)
+            self.image_file = None
+            self.save()
+
+    @property
+    def image_url(self):
+        """Return the URL for the image file if it exists."""
+        if self.image_file:
+            return self.image_file.url
+        return None
 
 class Validation(models.Model):
     """
