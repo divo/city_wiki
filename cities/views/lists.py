@@ -2,8 +2,8 @@ from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-
-from ..models import City, PoiList
+import json
+from ..models import City, PoiList, PointOfInterest
 
 import logging
 logger = logging.getLogger(__name__)
