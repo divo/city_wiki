@@ -1,6 +1,7 @@
 from django.db import models
 import reversion
 import os
+from django.forms import model_to_dict
 
 def city_image_path(instance, filename):
     """Generate file path for city images."""
@@ -52,8 +53,14 @@ class City(models.Model):
     def image_url(self):
         """Return the URL for the image file if it exists."""
         if self.image_file:
-            return self.image_file.url
+            return f'http://localhost:8000{self.image_file.url}'
         return None
+
+    def to_dict(self):
+        """Convert the model instance to a dictionary, handling special fields."""
+        data = model_to_dict(self, exclude=['image_file'])
+        data['image_url'] = self.image_url
+        return data
 
 @reversion.register()
 class District(models.Model):
@@ -121,8 +128,16 @@ class PointOfInterest(models.Model):
     def image_url(self):
         """Return the URL for the image file if it exists."""
         if self.image_file:
-            return self.image_file.url
+            return f'http://localhost:8000{self.image_file.url}'
         return None
+
+    def to_dict(self):
+        """Convert the model instance to a dictionary, handling special fields."""
+        data = model_to_dict(self, exclude=['id', 'city', 'image_file'])
+        data['image_url'] = self.image_url
+        if self.district:
+            data['district'] = self.district.name
+        return data
 
 class Validation(models.Model):
     """

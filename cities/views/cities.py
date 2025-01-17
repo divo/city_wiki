@@ -185,13 +185,12 @@ def dump_city(request, city_name):
     """Return a JSON dump of all data for a specific city."""
     try:
         city = get_object_or_404(City, name=city_name)
-
-        # Prepare the data structure
+        
         data = {
-            'city': model_to_dict(city, exclude=['id']),
+            'city': city.to_dict(),
             'districts': [],
             'points_of_interest': [],
-            'poi_lists': []  # Add new section for POI lists
+            'poi_lists': []
         }
 
         # Add districts
@@ -203,10 +202,7 @@ def dump_city(request, city_name):
 
         # Add POIs - only those with coordinates
         for poi in city.points_of_interest.filter(latitude__isnull=False, longitude__isnull=False):
-            poi_data = model_to_dict(poi, exclude=['id', 'city'])
-            if poi.district:
-                poi_data['district'] = poi.district.name
-            data['points_of_interest'].append(poi_data)
+            data['points_of_interest'].append(poi.to_dict())
 
         # Add POI lists
         for poi_list in city.poi_lists.all():
@@ -214,21 +210,14 @@ def dump_city(request, city_name):
                 'title': poi_list.title,
                 'created_at': poi_list.created_at,
                 'updated_at': poi_list.updated_at,
-                'pois': []
+                'pois': [poi.to_dict() for poi in poi_list.pois.all()]
             }
-            
-            # Add full POI objects to the list
-            for poi in poi_list.pois.all():
-                poi_data = model_to_dict(po)
-                if poi.district:
-                    poi_data['district'] = poi.district.name
-                list_data['pois'].append(poi_data)
-            
             data['poi_lists'].append(list_data)
 
         return JsonResponse(data, encoder=DjangoJSONEncoder, json_dumps_params={'indent': 2})
 
     except Exception as e:
+        logger.error(f"Error dumping city data: {str(e)}")
         return JsonResponse({
             'status': 'error',
             'message': str(e)
