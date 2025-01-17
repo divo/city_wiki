@@ -195,6 +195,45 @@
         color: #6c757d;
         margin-bottom: 15px;
     }
+
+    .list-actions {
+        display: flex;
+        width: 20%;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .list-actions select {
+        min-width: 200px;
+        padding: 5px 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+
+    .list-actions button {
+        white-space: nowrap;
+    }
+
+    .poi-checkbox {
+        margin-right: 10px;
+    }
+
+    .poi-row td:first-child {
+        display: flex;
+        align-items: center;
+    }
+
+    .poi-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
 </style>
 
 <div class="container">
@@ -335,6 +374,22 @@
         </div>
     </div>
 
+<div class="poi-actions"></div>
+    <div class="list-actions">
+        <select id="poiListSelect" class="form-control">
+            <option value="">Select a list...</option>
+            {% for list in city.poi_lists.all %}
+                <option value="{{ list.id }}">{{ list.title }}</option>
+            {% endfor %}
+        </select>
+        <button onclick="appendToList()" class="btn btn-primary">Add Selected to List</button>
+    </div>
+    <div class="filter-actions">
+        // ... existing filter actions ...
+    </div>
+</div>
+
+
     {% for category, pois in pois_by_category.items %}
         <section class="category-section">
             <h2>{{ category|title }} ({{ pois|length }})</h2>
@@ -355,6 +410,7 @@
 </div>
 
 <script>
+
 function deleteCity(cityName) {
     if (confirm(`Are you sure you want to delete ${cityName} and all its points of interest?`)) {
         fetch(`/city/${encodeURIComponent(cityName)}/delete/`, {
@@ -691,6 +747,46 @@ async function saveAbout() {
         }
     } catch (error) {
         alert('Error saving about text: ' + error);
+    }
+}
+
+async function appendToList() {
+    const listId = document.getElementById('poiListSelect').value;
+    if (!listId) {
+        alert('Please select a list');
+        return;
+    }
+    
+    const selectedPois = Array.from(selectedRows);  // Use the existing selectedRows Set
+    if (selectedPois.length === 0) {
+        alert('Please select at least one POI');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/city/{{ city.name }}/lists/${listId}/append/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                poi_ids: selectedPois
+            })
+        });
+        
+        const data = await response.json();
+        if (data.status === 'success') {
+            alert('POIs added to list successfully');
+            // Clear selections
+            selectedRows.clear();
+            document.querySelectorAll('.select-checkbox').forEach(cb => cb.checked = false);
+            document.querySelector('.select-all-checkbox').checked = false;
+            updateSelectionUI();
+        } else {
+            throw new Error(data.message || 'Failed to add POIs to list');
+        }
+    } catch (error) {
+        alert('Error adding POIs to list: ' + error.message);
     }
 }
 </script>

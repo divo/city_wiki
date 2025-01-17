@@ -21,6 +21,7 @@ urlpatterns = [
     path('city/<str:city_name>/lists/', views.poi_lists, name='poi_lists'),
     path('city/<str:city_name>/lists/create/', views.create_poi_list, name='create_poi_list'),
     path('city/<str:city_name>/lists/<int:list_id>/delete/', views.delete_poi_list, name='delete_poi_list'),
+    path('city/<str:city_name>/lists/<int:list_id>/append/', views.append_to_list, name='append_to_list'),
     path('city/<str:city_name>/tasks/<str:task_id>/execute/', views.execute_task, name='execute_task'),
     path('tasks/<str:task_id>/status/', views.check_task_status, name='check_task_status'),
     path('city/<str:city_name>/poi/<int:poi_id>/fetch_image/', views.fetch_poi_image, name='fetch_poi_image'),
