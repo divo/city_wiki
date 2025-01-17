@@ -7,6 +7,8 @@ from django.db.models import Count
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
 import json
+import reversion
+from reversion.models import Version
 
 from ..models import City, PointOfInterest
 from ..fetch_tasks import import_city_data

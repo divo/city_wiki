@@ -1,7 +1,8 @@
 from django.db import models
-import reversion
 import os
 from django.forms import model_to_dict
+from reversion.models import Version
+import reversion
 
 def city_image_path(instance, filename):
     """Generate file path for city images."""
