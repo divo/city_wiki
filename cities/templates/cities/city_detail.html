@@ -233,7 +233,10 @@
             {% else %}
                 <div class="no-image">
                     <p>No image available</p>
-                    <button onclick="fetchImages()" class="btn btn-primary">Find Images</button>
+                    <div class="search-controls">
+                        <input type="text" id="searchQuery" class="form-control" placeholder="Search for images (e.g. {{ city.name }} city skyline)" style="margin-bottom: 10px;">
+                        <button onclick="fetchImages()" class="btn btn-primary">Find Images</button>
+                    </div>
                 </div>
             {% endif %}
         </div>
@@ -348,7 +351,7 @@
 <!-- Image Modal -->
 <div id="imageModal" class="image-modal">
     <span class="close" onclick="closeImageModal()">&times;</span>
-    <img id="modalImage" src="" alt="Full size image">
+    <img id="modalImage" src="" alt="{{ city.name }}">
 </div>
 
 <script>
@@ -509,12 +512,21 @@ function resetUI() {
 async function fetchImages() {
     const container = document.querySelector('.city-image-container');
     const button = container.querySelector('button');
+    const searchInput = document.getElementById('searchQuery');
+    const searchQuery = searchInput ? searchInput.value : null;
+    
     button.disabled = true;
     button.textContent = 'Searching...';
     
     try {
         const response = await fetch(`/city/{{ city.name }}/fetch_image/`, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                search_query: searchQuery
+            })
         });
         
         const data = await response.json();
@@ -522,6 +534,17 @@ async function fetchImages() {
         if (data.status === 'success') {
             const grid = document.createElement('div');
             grid.className = 'image-grid';
+            
+            // Add search input at the top of results
+            const searchControls = document.createElement('div');
+            searchControls.className = 'search-controls';
+            searchControls.innerHTML = `
+                <input type="text" id="searchQuery" class="form-control" value="${searchQuery || ''}" 
+                       placeholder="Search for images (e.g. {{ city.name }} city skyline)" style="margin-bottom: 10px;">
+                <button onclick="fetchImages()" class="btn btn-primary">Search Again</button>
+            `;
+            container.innerHTML = '';
+            container.appendChild(searchControls);
             
             data.image_urls.forEach(imageUrl => {
                 const img = document.createElement('img');
@@ -532,11 +555,18 @@ async function fetchImages() {
                 grid.appendChild(img);
             });
             
-            container.innerHTML = '';
             container.appendChild(grid);
         } else {
-            button.textContent = 'No Images Found';
-            button.disabled = false;
+            const searchControls = document.createElement('div');
+            searchControls.className = 'search-controls';
+            searchControls.innerHTML = `
+                <input type="text" id="searchQuery" class="form-control" value="${searchQuery || ''}" 
+                       placeholder="Search for images (e.g. {{ city.name }} city skyline)" style="margin-bottom: 10px;">
+                <button onclick="fetchImages()" class="btn btn-primary">Try Again</button>
+            `;
+            container.innerHTML = '';
+            container.appendChild(searchControls);
+            container.appendChild(document.createTextNode('No images found. Try a different search query.'));
         }
     } catch (error) {
         console.error('Error fetching images:', error);

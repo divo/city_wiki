@@ -202,7 +202,15 @@ def fetch_city_image(request, city_name):
     try:
         city = get_object_or_404(City, name=city_name)
         
-        search_query = f"{city.name} city skyline"
+        # Get custom search query from request body if provided
+        try:
+            data = json.loads(request.body)
+            search_query = data.get('search_query', f"{city.name} city skyline")
+        except json.JSONDecodeError:
+            search_query = f"{city.name} city skyline"  # Default if no query provided
+            
+        logger.info(f"Fetching images for city {city_name} with query: {search_query}")
+        
         wikimedia_result = _fetch_wikimedia_images(search_query)
         pixabay_result = _fetch_pixabay_images(search_query)
 
