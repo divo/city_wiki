@@ -163,6 +163,12 @@
         font-size: 30px;
         cursor: pointer;
     }
+    tr.no-image {
+        background-color: #ffe6e6;  /* Light red background */
+    }
+    tr.no-image:hover {
+        background-color: #ffd9d9;  /* Slightly darker red on hover */
+    }
 </style>
 
 <div class="container">
@@ -187,7 +193,7 @@
                         </thead>
                         <tbody>
                             {% for poi in list.pois.all %}
-                                <tr>
+                                <tr class="{% if not poi.image_url %}no-image{% endif %}">
                                     <td>
                                         <div style="display: flex; flex-direction: column;">
                                             {% if poi.image_url %}
