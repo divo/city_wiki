@@ -10,7 +10,7 @@ import json
 import reversion
 from reversion.models import Version
 
-from ..models import City, PointOfInterest
+from ..models import City, PointOfInterest, District
 from ..fetch_tasks import import_city_data
 from celery.result import AsyncResult
 
@@ -94,7 +94,8 @@ def poi_edit(request, city_name, poi_id):
             'phone': poi.phone,
             'website': poi.website,
             'hours': poi.hours,
-            'rank': poi.rank
+            'rank': poi.rank,
+            'district': poi.district.id if poi.district else None
         }
 
         # Get new values from POST data
@@ -109,14 +110,22 @@ def poi_edit(request, city_name, poi_id):
             'phone': request.POST.get('phone'),
             'website': request.POST.get('website'),
             'hours': request.POST.get('hours'),
-            'rank': request.POST.get('rank')
+            'rank': request.POST.get('rank'),
+            'district': request.POST.get('district') or None
         }
 
         # Create a new revision
         with reversion.create_revision():
             # Update fields
             for field, value in new_values.items():
-                setattr(poi, field, value)
+                if field == 'district':
+                    if value:
+                        district = get_object_or_404(District, id=value, city__name=city_name)
+                        poi.district = district
+                    else:
+                        poi.district = None
+                else:
+                    setattr(poi, field, value)
 
             poi.save()
 

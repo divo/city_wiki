@@ -382,7 +382,7 @@
                         <td {% if not poi.created_at %}class="empty-cell"{% endif %}>{{ poi.created_at|default:"" }}</td>
                         <td>
                             <a href="{% url 'poi_history' city.name poi.id %}" class="btn btn-sm btn-info">History</a>
-                            <button onclick="openEditModal({{ poi.id }}, '{{ poi.name|escapejs }}', '{{ poi.category }}', '{{ poi.sub_category|escapejs }}', '{{ poi.description|escapejs }}', '{{ poi.latitude|default:'' }}', '{{ poi.longitude|default:'' }}', '{{ poi.address|escapejs|default:'' }}', '{{ poi.phone|escapejs|default:'' }}', '{{ poi.website|escapejs|default:'' }}', '{{ poi.hours|escapejs|default:'' }}', {{ poi.rank|default:0 }})" class="btn btn-sm btn-primary">Edit</button>
+                            <button onclick="openEditModal({{ poi.id }}, '{{ poi.name|escapejs }}', '{{ poi.category }}', '{{ poi.sub_category|escapejs }}', '{{ poi.description|escapejs }}', '{{ poi.latitude|default:'' }}', '{{ poi.longitude|default:'' }}', '{{ poi.address|escapejs|default:'' }}', '{{ poi.phone|escapejs|default:'' }}', '{{ poi.website|escapejs|default:'' }}', '{{ poi.hours|escapejs|default:'' }}', {{ poi.rank|default:0 }}, {{ poi.district.id }})" class="btn btn-sm btn-primary">Edit</button>
                         </td>
                     </tr>
                 {% endfor %}
@@ -465,6 +465,16 @@
                         <input type="number" id="rank" name="rank" class="form-control" min="1" max="5">
                     </div>
 
+                    <div class="form-group">
+                        <label for="editDistrict">District:</label>
+                        <select id="editDistrict" name="district" class="form-control">
+                            <option value="">Main City</option>
+                            {% for district in districts %}
+                                <option value="{{ district.id }}" {% if district.id == poi.district.id %}selected{% endif %}>{{ district.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                         <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
@@ -531,7 +541,7 @@
             return patternIdx === pattern.length;
         }
 
-        function openEditModal(id, name, category, subCategory, description, lat, lon, address, phone, website, hours, rank) {
+        function openEditModal(id, name, category, subCategory, description, lat, lon, address, phone, website, hours, rank, districtId) {
             document.getElementById('poiId').value = id;
             document.getElementById('name').value = name;
             document.getElementById('category').value = category;
@@ -544,6 +554,7 @@
             document.getElementById('website').value = website;
             document.getElementById('hours').value = hours;
             document.getElementById('rank').value = rank;
+            document.getElementById('editDistrict').value = districtId || '';
             
             document.getElementById('editModal').style.display = 'block';
         }
