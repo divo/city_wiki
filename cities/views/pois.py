@@ -108,7 +108,7 @@ def poi_edit(request, city_name, poi_id):
             'longitude': request.POST.get('longitude') or None,
             'address': request.POST.get('address'),
             'phone': request.POST.get('phone'),
-            'website': request.POST.get('website'),
+            'website': request.POST.get('website') or None,
             'hours': request.POST.get('hours'),
             'rank': request.POST.get('rank'),
             'district': request.POST.get('district') or None
