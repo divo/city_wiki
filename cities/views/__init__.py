@@ -18,6 +18,7 @@ from .lists import (
     poi_lists,
     create_poi_list,
     delete_poi_list,
+    append_to_list,
 )
 
 from .pois import (
