@@ -638,39 +638,69 @@ document.querySelectorAll('.column-search').forEach(input => {
 let currentTaskId = null;
 let pollingInterval = null;
 
-document.getElementById('taskSelect').addEventListener('change', function() {
-    const executeButton = document.getElementById('executeTask');
-    executeButton.disabled = !this.value;
-});
-
-document.getElementById('executeTask').addEventListener('click', async function() {
+function runSelectedTask() {
     const taskId = document.getElementById('taskSelect').value;
-    if (!taskId) return;
-    
-    // Reset UI
+    if (!taskId) {
+        alert('Please select a task');
+        return;
+    }
+
+    // Reset UI state
     document.getElementById('taskResult').style.display = 'none';
     document.getElementById('taskStatus').style.display = 'block';
-    this.disabled = true;
     document.getElementById('taskSelect').disabled = true;
-    
-    try {
-        // Start the task
-        const response = await fetch(`/city/{{ city.name }}/tasks/${taskId}/execute/`, {
-            method: 'POST'
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
+    document.getElementById('duplicatesTable').style.display = 'none';
+
+    // If it's the local OSM task, require a PBF file
+    if (taskId === 'fetch_osm_ids_local') {
+        const pbfFile = document.getElementById('pbfSelect').value;
+        if (!pbfFile) {
+            alert('Please select a PBF file for local OSM ID lookup');
+            return;
+        }
+        runTask(taskId, { pbf_file: pbfFile });
+    } else {
+        runTask(taskId);
+    }
+}
+
+function runTask(taskId, extraParams = {}) {
+    // Show loading state
+    const button = document.querySelector('.task-section .btn-primary');
+    const originalText = button.textContent;
+    button.textContent = 'Running...';
+    button.disabled = true;
+
+    // Prepare the request data
+    const data = {
+        task: taskId,
+        ...extraParams
+    };
+
+    // Make the request
+    fetch(`/city/{{ city.name }}/tasks/${taskId}/execute/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
             currentTaskId = data.task_id;
             startPolling();
         } else {
             showError(data.message || 'Failed to start task');
+            resetUI();
         }
-    } catch (error) {
-        showError('Error starting task: ' + error.message);
-    }
-});
+    })
+    .catch(error => {
+        showError('Error starting task: ' + error);
+        resetUI();
+    });
+}
 
 function startPolling() {
     if (pollingInterval) clearInterval(pollingInterval);
@@ -690,7 +720,6 @@ function startPolling() {
                 resetUI();
             }
             // Continue polling if status is 'processing'
-            
         } catch (error) {
             clearInterval(pollingInterval);
             showError('Error checking task status: ' + error.message);
@@ -746,6 +775,14 @@ function showSuccess(message, data) {
     }
 }
 
+function resetUI() {
+    const button = document.querySelector('.task-section .btn-primary');
+    button.textContent = 'Run Task';
+    button.disabled = false;
+    document.getElementById('taskSelect').disabled = false;
+    currentTaskId = null;
+}
+
 // Helper function to safely escape HTML
 function escapeHtml(unsafe) {
     return unsafe
@@ -756,11 +793,11 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
-function resetUI() {
-    document.getElementById('executeTask').disabled = false;
-    document.getElementById('taskSelect').disabled = false;
-    currentTaskId = null;
-}
+// Add change handler for task select
+document.getElementById('taskSelect').addEventListener('change', function() {
+    const button = document.querySelector('.task-section .btn-primary');
+    button.disabled = !this.value;
+});
 
 async function fetchImages() {
     const container = document.querySelector('.city-image-container');
@@ -985,66 +1022,6 @@ async function appendToList() {
     } catch (error) {
         alert('Error adding POIs to list: ' + error.message);
     }
-}
-
-function runSelectedTask() {
-    const taskId = document.getElementById('taskSelect').value;
-    if (!taskId) {
-        alert('Please select a task');
-        return;
-    }
-
-    // If it's the local OSM task, require a PBF file
-    if (taskId === 'fetch_osm_ids_local') {
-        const pbfFile = document.getElementById('pbfSelect').value;
-        if (!pbfFile) {
-            alert('Please select a PBF file for local OSM ID lookup');
-            return;
-        }
-        runTask(taskId, { pbf_file: pbfFile });
-    } else {
-        runTask(taskId);
-    }
-}
-
-function runTask(taskId, extraParams = {}) {
-    // Show loading state
-    const button = document.querySelector('button');
-    const originalText = button.textContent;
-    button.textContent = 'Running...';
-    button.disabled = true;
-
-    // Prepare the request data
-    const data = {
-        task: taskId,
-        ...extraParams
-    };
-
-    // Make the request
-    fetch(`/city/{{ city.name }}/task/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert('Task started successfully: ' + data.message);
-        } else {
-            alert('Error starting task: ' + data.message);
-        }
-    })
-    .catch(error => {
-        alert('Error starting task: ' + error);
-    })
-    .finally(() => {
-        // Reset button state
-        button.textContent = originalText;
-        button.disabled = false;
-    });
 }
 </script>
 {% endblock %}
