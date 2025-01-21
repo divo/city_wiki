@@ -296,11 +296,26 @@
         font-size: 0.9em;
         line-height: 1.3;
     }
+
+    .coordinates {
+        font-size: 1.1em;
+        color: #666;
+        margin: 0.5em 0;
+    }
+    .text-muted {
+        color: #999;
+        font-style: italic;
+    }
 </style>
 
 <div class="container">
     <div class="city-header">
         <h1>{{ city.name }}</h1>
+        {% if city.latitude and city.longitude %}
+            <p class="coordinates">📍 {{ city.latitude|floatformat:4 }}, {{ city.longitude|floatformat:4 }}</p>
+        {% else %}
+            <p class="coordinates text-muted">No coordinates available</p>
+        {% endif %}
         <p>Last updated: {{ city.updated_at|date:"F j, Y" }}</p>
         <div class="actions">
             <a href="{% url 'city_list' %}" class="back-link">← Back to Cities</a>

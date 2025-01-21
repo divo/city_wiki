@@ -290,4 +290,78 @@ def geocode_missing_addresses(city_id):
         logger.error(f"Error in geocode_missing_addresses task: {str(e)}")
         raise
 
+@shared_task
+def geocode_city_coordinates(city_id):
+    """
+    Fetch coordinates for a city using Mapbox's geocoding API.
+    This should be run before attempting to geocode POIs to ensure proper proximity biasing.
+    """
+    try:
+        city = City.objects.get(id=city_id)
+        logger.info(f"Starting city coordinate lookup for {city.name}")
+        
+        mapbox_token = os.environ.get('MAPBOX_TOKEN')
+        if not mapbox_token:
+            raise ValueError("MAPBOX_TOKEN environment variable not set")
+        
+        # Construct search query with city name and country
+        search_text = f"{city.name}, {city.country}" if city.country else city.name
+        
+        # Call Mapbox Forward Geocoding API
+        response = requests.get(
+            'https://api.mapbox.com/geocoding/v5/mapbox.places/' + search_text + '.json',
+            params={
+                'access_token': mapbox_token,
+                'limit': 1,
+                'types': 'place',  # Limit to cities/places
+            }
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            if data['features']:
+                # Get the first (most relevant) result
+                feature = data['features'][0]
+                coordinates = feature['geometry']['coordinates']
+                
+                # Update the city with the new coordinates
+                city.longitude = coordinates[0]
+                city.latitude = coordinates[1]
+                
+                # If country wasn't set, get it from the context
+                if not city.country:
+                    for context in feature.get('context', []):
+                        if context.get('id', '').startswith('country.'):
+                            city.country = context['text']
+                            break
+                
+                city.save()
+                logger.info(f"Updated coordinates for {city.name}: ({city.latitude}, {city.longitude})")
+                
+                return {
+                    'status': 'success',
+                    'message': f'Updated coordinates for {city.name}',
+                    'coordinates': {
+                        'latitude': city.latitude,
+                        'longitude': city.longitude
+                    },
+                    'country': city.country
+                }
+            else:
+                logger.warning(f"No coordinates found for city {city.name}")
+                return {
+                    'status': 'warning',
+                    'message': f'No coordinates found for {city.name}'
+                }
+        else:
+            logger.error(f"Mapbox API error for city {city.name}: {response.text}")
+            return {
+                'status': 'error',
+                'message': f'API error: {response.text}'
+            }
+        
+    except Exception as e:
+        logger.error(f"Error in geocode_city_coordinates task: {str(e)}")
+        raise
+
 # Data transformation tasks will be added here
