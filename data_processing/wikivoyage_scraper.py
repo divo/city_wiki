@@ -162,10 +162,12 @@ class WikivoyageScraper:
         return ' '.join(soup.get_text().split())
 
     def _parse_listing_template(self, template: wtp.Template, category: str, rank: int, section_title: str) -> Optional[PointOfInterest]:
-        # Extract arguments from template
-        args = {arg.name.strip().lower(): arg.value.strip() 
-               for arg in template.arguments 
-               if arg.value.strip()}
+        # Extract arguments from template, filtering out empty values
+        args = {}
+        for arg in template.arguments:
+            value = arg.value.strip()
+            if value and value != "None":  # Only include non-empty, non-None values
+                args[arg.name.strip().lower()] = value
         
         if 'name' not in args:
             return None
@@ -188,17 +190,25 @@ class WikivoyageScraper:
         if 'content' in args:
             content = self._clean_text(args['content'])
             description = f"{description} {content}" if description else content
+        description = description.strip() or None  # Convert empty string to None
+
+        # Helper function to clean text or return None
+        def clean_or_none(value):
+            if not value:
+                return None
+            cleaned = self._clean_text(value)
+            return cleaned if cleaned else None
 
         return PointOfInterest(
-            name=name,  # Use the cleaned name
+            name=name,
             category=category,
             sub_category=section_title,
-            description=description.strip(),
+            description=description,
             coordinates=coords,
-            address=args.get('address'),
-            phone=args.get('phone'),
-            website=args.get('url'),
-            hours=args.get('hours'),
+            address=clean_or_none(args.get('address')),
+            phone=clean_or_none(args.get('phone')),
+            website=clean_or_none(args.get('url')),
+            hours=clean_or_none(args.get('hours')),
             images=[args['image']] if 'image' in args else [],
             rank=rank
         )
