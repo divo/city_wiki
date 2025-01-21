@@ -12,6 +12,8 @@ import requests
 from urllib.parse import urlparse
 from django.core.files import File
 from django.core.files.temp import NamedTemporaryFile
+import glob
+from django.conf import settings
 
 from ..models import City, PointOfInterest
 from ..fetch_tasks import import_city_data
@@ -28,6 +30,8 @@ ENRICHMENT_TASKS = [
     ('geocode_missing_coordinates', 'Lookup Missing Coordinates from Addresses'),
     ('dedup_main_city', 'Merge Duplicates in Main City'),
     ('find_all_duplicates', 'Find All Duplicates'),
+    ('fetch_osm_ids', 'Fetch OpenStreetMap IDs (Online)'),
+    ('fetch_osm_ids_local', 'Fetch OpenStreetMap IDs (Local PBF)'),
     # Add more tasks here as they're implemented
 ]
 
@@ -35,6 +39,14 @@ ENRICHMENT_TASKS = [
 def city_list(request):
     cities = City.objects.all()
     return render(request, 'cities/city_list.html', {'cities': cities})
+
+
+def list_pbf_files():
+    """List all .osm.pbf files in the pbf directory."""
+    pbf_dir = os.path.join(settings.BASE_DIR, 'pbf')
+    if not os.path.exists(pbf_dir):
+        return []
+    return [os.path.basename(f) for f in glob.glob(os.path.join(pbf_dir, '*.osm.pbf'))]
 
 
 def city_detail(request, city_name):
@@ -55,6 +67,9 @@ def city_detail(request, city_name):
 
     # Get all districts for the filter dropdown
     districts = city.districts.all().order_by('name')
+
+    # Get list of PBF files
+    pbf_files = list_pbf_files()
 
     # Calculate additional statistics
     stats = {
@@ -128,6 +143,7 @@ def city_detail(request, city_name):
         'districts': districts,
         'selected_district': district_id,
         'enrichment_tasks': ENRICHMENT_TASKS,
+        'pbf_files': pbf_files,
         'stats': stats,
     })
 

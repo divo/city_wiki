@@ -430,15 +430,31 @@
                 <div class="row align-items-end">
                     <div class="col-md-6">
                         <label for="taskSelect" class="form-label">Select Task:</label>
-                        <select id="taskSelect" class="form-select">
-                            <option value="">Choose a task...</option>
-                            {% for task_id, task_name in enrichment_tasks %}
-                                <option value="{{ task_id }}">{{ task_name }}</option>
-                            {% endfor %}
-                        </select>
+                        <div class="input-group">
+                            <select class="form-control" id="taskSelect">
+                                <option value="">Select a task...</option>
+                                {% for task_id, task_name in enrichment_tasks %}
+                                    <option value="{{ task_id }}">{{ task_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="input-group-append">
+                                <button class="btn btn-primary" onclick="runSelectedTask()">Run Task</button>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <button id="executeTask" class="btn btn-primary" disabled>Execute Task</button>
+                        <div class="input-group">
+                            <select class="form-control" id="pbfSelect" {% if not pbf_files %}disabled{% endif %}>
+                                {% if pbf_files %}
+                                    <option value="">Select a PBF file...</option>
+                                    {% for pbf_file in pbf_files %}
+                                        <option value="{{ pbf_file }}">{{ pbf_file }}</option>
+                                    {% endfor %}
+                                {% else %}
+                                    <option value="">No PBF files found in pbf directory</option>
+                                {% endif %}
+                            </select>
+                        </div>
                     </div>
                 </div>
                 
@@ -969,6 +985,66 @@ async function appendToList() {
     } catch (error) {
         alert('Error adding POIs to list: ' + error.message);
     }
+}
+
+function runSelectedTask() {
+    const taskId = document.getElementById('taskSelect').value;
+    if (!taskId) {
+        alert('Please select a task');
+        return;
+    }
+
+    // If it's the local OSM task, require a PBF file
+    if (taskId === 'fetch_osm_ids_local') {
+        const pbfFile = document.getElementById('pbfSelect').value;
+        if (!pbfFile) {
+            alert('Please select a PBF file for local OSM ID lookup');
+            return;
+        }
+        runTask(taskId, { pbf_file: pbfFile });
+    } else {
+        runTask(taskId);
+    }
+}
+
+function runTask(taskId, extraParams = {}) {
+    // Show loading state
+    const button = document.querySelector('button');
+    const originalText = button.textContent;
+    button.textContent = 'Running...';
+    button.disabled = true;
+
+    // Prepare the request data
+    const data = {
+        task: taskId,
+        ...extraParams
+    };
+
+    // Make the request
+    fetch(`/city/{{ city.name }}/task/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('Task started successfully: ' + data.message);
+        } else {
+            alert('Error starting task: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error starting task: ' + error);
+    })
+    .finally(() => {
+        // Reset button state
+        button.textContent = originalText;
+        button.disabled = false;
+    });
 }
 </script>
 {% endblock %}

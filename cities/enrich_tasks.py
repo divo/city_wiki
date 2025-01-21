@@ -8,6 +8,12 @@ from difflib import SequenceMatcher
 from django.db.models import Q
 import requests
 import os
+import time
+import subprocess
+from pathlib import Path
+from django.conf import settings
+import tempfile
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -455,6 +461,192 @@ def geocode_city_coordinates(city_id):
         
     except Exception as e:
         logger.error(f"Error in geocode_city_coordinates task: {str(e)}")
+        raise
+
+@shared_task
+def fetch_osm_ids(city_id):
+    """
+    Find POIs without OSM IDs and try to match them using Overpass API.
+    Searches for POIs within 5 meters of our coordinates.
+    Processes one POI at a time to make the task resumable.
+    """
+    try:
+        city = City.objects.get(id=city_id)
+        logger.info(f"Starting OSM ID lookup for {city.name}")
+        
+        # Get POIs without OSM IDs but with coordinates
+        pois = PointOfInterest.objects.filter(
+            city=city,
+            osm_id__isnull=True,
+            latitude__isnull=False,
+            longitude__isnull=False
+        )
+        
+        total_pois = pois.count()
+        processed_count = 0
+        updated_count = 0
+        
+        # Overpass API endpoint
+        overpass_url = "https://overpass-api.de/api/interpreter"
+        
+        for poi in pois:
+            try:
+                # Construct Overpass QL query to find nodes within 5 meters
+                # nwr means nodes, ways, and relations
+                overpass_query = f"""
+                [out:json];
+                nwr(around:5,{poi.latitude},{poi.longitude})->.all;
+                .all out body;
+                """
+                
+                response = requests.post(overpass_url, data={'data': overpass_query})
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data['elements']:
+                        # Get the closest element (first one)
+                        element = data['elements'][0]
+                        osm_id = str(element['id'])
+                        element_type = element['type']  # node, way, or relation
+                        
+                        # Update the POI with the OSM ID, prefixing with type for clarity
+                        poi.osm_id = f"{element_type}/{osm_id}"
+                        poi.save()
+                        updated_count += 1
+                        logger.info(f"Updated OSM ID for POI {poi.name} ({poi.latitude}, {poi.longitude}): {poi.osm_id}")
+                    else:
+                        logger.warning(f"No POI found within 5m of coordinates ({poi.latitude}, {poi.longitude}) for {poi.name}")
+                else:
+                    logger.error(f"Overpass API error for POI {poi.name}: {response.text}")
+                
+                # Sleep briefly to respect rate limits
+                time.sleep(1)
+                
+            except Exception as e:
+                logger.error(f"Error processing POI {poi.name}: {str(e)}")
+            
+            processed_count += 1
+            
+            # Log progress every 10 POIs
+            if processed_count % 10 == 0:
+                logger.info(f"Processed {processed_count}/{total_pois} POIs")
+        
+        return {
+            'status': 'success',
+            'message': f'Processed {processed_count} POIs, updated {updated_count} with OSM IDs',
+            'processed_count': processed_count,
+            'updated_count': updated_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in fetch_osm_ids task: {str(e)}")
+        raise
+
+@shared_task
+def fetch_osm_ids_local(city_id, pbf_file=None):
+    """
+    Find POIs without OSM IDs by querying a local .osm.pbf file using osmium.
+    Searches for POIs within 5 meters of our coordinates.
+    Processes POIs in batches for efficiency.
+    
+    Args:
+        city_id: ID of the city to process
+        pbf_file: Name of the PBF file to use (must be in the pbf directory)
+    """
+    try:
+        city = City.objects.get(id=city_id)
+        logger.info(f"Starting local OSM ID lookup for {city.name}")
+        
+        # Get POIs without OSM IDs but with coordinates
+        pois = PointOfInterest.objects.filter(
+            city=city,
+            osm_id__isnull=True,
+            latitude__isnull=False,
+            longitude__isnull=False
+        )
+        
+        total_pois = pois.count()
+        processed_count = 0
+        updated_count = 0
+        
+        # Get path to OSM PBF file
+        if not pbf_file:
+            raise ValueError("No PBF file specified")
+        
+        pbf_dir = os.path.join(settings.BASE_DIR, 'pbf')
+        osm_pbf_path = os.path.join(pbf_dir, pbf_file)
+        
+        if not os.path.exists(osm_pbf_path):
+            raise FileNotFoundError(f"OSM PBF file not found at {osm_pbf_path}")
+        
+        # Process POIs in batches of 10 for efficiency
+        batch_size = 10
+        for i in range(0, total_pois, batch_size):
+            batch = pois[i:i + batch_size]
+            
+            # Create a temporary file with coordinates to search
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt') as coords_file:
+                for poi in batch:
+                    # Write each POI's coordinates to the file
+                    coords_file.write(f"{poi.longitude} {poi.latitude}\n")
+                coords_file.flush()
+                
+                try:
+                    # Use osmium to find nodes near these coordinates
+                    # The command will output JSON with any found elements
+                    cmd = [
+                        'osmium', 'findnodes',
+                        '--radius=5',  # 5 meters radius
+                        '--output-format=json',
+                        osm_pbf_path,
+                        coords_file.name
+                    ]
+                    
+                    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                    
+                    if result.stdout:
+                        # Parse the JSON output
+                        matches = json.loads(result.stdout)
+                        
+                        # Process each match
+                        for poi_idx, match in enumerate(matches):
+                            if match['elements']:
+                                poi = batch[poi_idx]
+                                # Get the closest element (first one)
+                                element = match['elements'][0]
+                                osm_id = str(element['id'])
+                                element_type = element['type']
+                                
+                                # Update the POI with the OSM ID
+                                poi.osm_id = f"{element_type}/{osm_id}"
+                                poi.save()
+                                updated_count += 1
+                                logger.info(f"Updated OSM ID for POI {poi.name} ({poi.latitude}, {poi.longitude}): {poi.osm_id}")
+                            else:
+                                logger.warning(f"No POI found within 5m of coordinates ({batch[poi_idx].latitude}, {batch[poi_idx].longitude}) for {batch[poi_idx].name}")
+                    
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Error running osmium: {e.stderr}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error parsing osmium output: {str(e)}")
+                except Exception as e:
+                    logger.error(f"Unexpected error processing batch: {str(e)}")
+            
+            processed_count += len(batch)
+            logger.info(f"Processed {processed_count}/{total_pois} POIs")
+            
+            # Brief pause between batches
+            time.sleep(0.1)
+        
+        return {
+            'status': 'success',
+            'message': f'Processed {processed_count} POIs, updated {updated_count} with OSM IDs',
+            'processed_count': processed_count,
+            'updated_count': updated_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in fetch_osm_ids_local task: {str(e)}")
         raise
 
 # Data transformation tasks will be added here

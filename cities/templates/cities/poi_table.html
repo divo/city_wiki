@@ -39,7 +39,8 @@
         .poi-table td:nth-child(9) { width: 7%; }   /* Contact */
         .poi-table td:nth-child(10) { width: 8%; }  /* Hours */
         .poi-table td:nth-child(11) { width: 7%; }  /* Website */
-        .poi-table td:nth-child(12) { width: 7%; }  /* Created at */
+        .poi-table td:nth-child(12) { width: 7%; }  /* OSM ID */
+        .poi-table td:nth-child(13) { width: 7%; }  /* Created at */
         
         .btn-sm {
             padding: 0.25rem 0.5rem;
@@ -332,6 +333,11 @@
                         </a>
                     </th>
                     <th>
+                        <a href="?sort=osm_id&dir={% if sort_by == 'osm_id' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
+                            OSM ID {% if sort_by == 'osm_id' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
+                        </a>
+                    </th>
+                    <th>
                         <a href="?sort=created_at&dir={% if sort_by == 'created_at' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}{% if max_rank %}&max_rank={{ max_rank }}{% endif %}{% if selected_district %}&district={{ selected_district }}{% endif %}">
                             Created at {% if sort_by == 'created_at' %}{% if sort_dir == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                         </a>
@@ -378,6 +384,9 @@
                             {% if poi.website %}
                                 <a href="{{ poi.website }}" target="_blank">Website</a>
                             {% endif %}
+                        </td>
+                        <td {% if not poi.osm_id %}class="empty-cell"{% endif %}>
+                            {{ poi.osm_id|default:"" }}
                         </td>
                         <td {% if not poi.created_at %}class="empty-cell"{% endif %}>{{ poi.created_at|default:"" }}</td>
                         <td>
