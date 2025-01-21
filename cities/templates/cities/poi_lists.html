@@ -104,7 +104,10 @@
         background: #c82333;
     }
     td {
-        vertical-align: middle !important;
+        vertical-align: top !important;
+    }
+    .poi-name {
+        margin-top: 10px;
     }
     /* New styles for table rows */
     .table {
@@ -204,7 +207,7 @@
                                                     </div>
                                                 </div>
                                             {% endif %}
-                                            {{ poi.name }}
+                                            <div class="poi-name">{{ poi.name }}</div>
                                         </div>
                                     </td>
                                     <td>{{ poi.get_category_display }}</td>
