@@ -1,10 +1,10 @@
 """Module for handling text generation using OpenAI's API."""
 
+import json
 from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse
 from django.conf import settings
 from openai import OpenAI
-import json
 from ..models import City
 import logging
 
