@@ -95,19 +95,26 @@ def import_city_data(self, city_name: str, root_city_name: str = None, parent_ta
             db_pois = []
             for poi in pois:
                 coords = poi.coordinates or (None, None)
+                
+                # Helper function to convert empty strings to None
+                def clean_value(val):
+                    if val is None or val == "None" or val.strip() == "":
+                        return None
+                    return val.strip()
+                
                 db_pois.append(PointOfInterest(
                     city=city,
                     district=current_district,  # Will be None for root city POIs
                     name=poi.name,
                     category=poi.category,
-                    sub_category=poi.sub_category,
-                    description=poi.description,
+                    sub_category=clean_value(poi.sub_category),
+                    description=clean_value(poi.description),
                     latitude=coords[0],
                     longitude=coords[1],
-                    address=poi.address,
-                    phone=poi.phone,
-                    website=poi.website,
-                    hours=poi.hours,
+                    address=clean_value(poi.address),
+                    phone=clean_value(poi.phone),
+                    website=clean_value(poi.website),
+                    hours=clean_value(poi.hours),
                     rank=poi.rank
                 ))
 
