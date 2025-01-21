@@ -8,6 +8,7 @@ from difflib import SequenceMatcher
 from django.db.models import Q
 import requests
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -460,7 +461,8 @@ def geocode_city_coordinates(city_id):
 @shared_task
 def fetch_osm_ids(city_id):
     """
-    Find POIs without OSM IDs and try to match them using Mapbox's reverse geocoding API.
+    Find POIs without OSM IDs and try to match them using Overpass API.
+    Searches for POIs within 5 meters of our coordinates.
     Processes one POI at a time to make the task resumable.
     """
     try:
@@ -479,44 +481,41 @@ def fetch_osm_ids(city_id):
         processed_count = 0
         updated_count = 0
         
-        mapbox_token = os.environ.get('MAPBOX_TOKEN')
-        if not mapbox_token:
-            raise ValueError("MAPBOX_TOKEN environment variable not set")
+        # Overpass API endpoint
+        overpass_url = "https://overpass-api.de/api/interpreter"
         
         for poi in pois:
             try:
-                # Use reverse geocoding with the POI's coordinates
-                response = requests.get(
-                    f'https://api.mapbox.com/geocoding/v5/mapbox.places/{poi.longitude},{poi.latitude}.json',
-                    params={
-                        'access_token': mapbox_token,
-                        'limit': 1,
-                        'types': 'poi',  # Look for points of interest only
-                    }
-                )
+                # Construct Overpass QL query to find nodes within 5 meters
+                # nwr means nodes, ways, and relations
+                overpass_query = f"""
+                [out:json];
+                nwr(around:5,{poi.latitude},{poi.longitude})->.all;
+                .all out body;
+                """
+                
+                response = requests.post(overpass_url, data={'data': overpass_query})
                 
                 if response.status_code == 200:
                     data = response.json()
-                    if data['features']:
-                        # Get the first (most relevant) result
-                        feature = data['features'][0]
+                    if data['elements']:
+                        # Get the closest element (first one)
+                        element = data['elements'][0]
+                        osm_id = str(element['id'])
+                        element_type = element['type']  # node, way, or relation
                         
-                        # Extract OSM ID from the feature ID
-                        # Mapbox feature IDs are in the format "poi.{osm_id}"
-                        if feature['id'].startswith('poi.'):
-                            osm_id = feature['id'].split('.')[1]
-                            
-                            # Update the POI with the OSM ID
-                            poi.osm_id = osm_id
-                            poi.save()
-                            updated_count += 1
-                            logger.info(f"Updated OSM ID for POI {poi.name} ({poi.latitude}, {poi.longitude}): {osm_id}")
-                        else:
-                            logger.warning(f"No OSM ID found in feature for POI {poi.name} at ({poi.latitude}, {poi.longitude})")
+                        # Update the POI with the OSM ID, prefixing with type for clarity
+                        poi.osm_id = f"{element_type}/{osm_id}"
+                        poi.save()
+                        updated_count += 1
+                        logger.info(f"Updated OSM ID for POI {poi.name} ({poi.latitude}, {poi.longitude}): {poi.osm_id}")
                     else:
-                        logger.warning(f"No POI found at coordinates ({poi.latitude}, {poi.longitude}) for {poi.name}")
+                        logger.warning(f"No POI found within 5m of coordinates ({poi.latitude}, {poi.longitude}) for {poi.name}")
                 else:
-                    logger.error(f"Mapbox API error for POI {poi.name}: {response.text}")
+                    logger.error(f"Overpass API error for POI {poi.name}: {response.text}")
+                
+                # Sleep briefly to respect rate limits
+                time.sleep(1)
                 
             except Exception as e:
                 logger.error(f"Error processing POI {poi.name}: {str(e)}")
