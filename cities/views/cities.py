@@ -288,6 +288,12 @@ def city_list_json(request):
 def city_map(request, city_name):
     city = get_object_or_404(City, name=city_name)
 
+    # Get mapbox token from environment
+    mapbox_token = os.environ.get('MAPBOX_TOKEN')
+    if not mapbox_token:
+        logger.error("MAPBOX_TOKEN environment variable not set")
+        mapbox_token = ''  # Fallback to empty to show error in template
+
     # Get max_rank filter from query params
     try:
         max_rank = int(request.GET.get('max_rank', 0))
@@ -357,6 +363,7 @@ def city_map(request, city_name):
         'category_counts': {item['category']: item['count'] for item in category_counts},
         'districts': districts,
         'selected_district': district_id,
+        'mapbox_token': mapbox_token,  # Pass token to template
     })
 
 @csrf_exempt
