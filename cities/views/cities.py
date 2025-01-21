@@ -22,14 +22,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 ENRICHMENT_TASKS = [
-    ('normalize_categories', 'Normalize Categories'),
     ('geocode_city_coordinates', 'Lookup City Coordinates'),
     ('geocode_missing_addresses', 'Lookup Missing Addresses from Coordinates'),
     ('geocode_missing_coordinates', 'Lookup Missing Coordinates from Addresses'),
     ('dedup_main_city', 'Merge Duplicates in Main City'),
     ('find_all_duplicates', 'Find All Duplicates'),
-    ('fetch_osm_ids', 'Fetch OpenStreetMap IDs (Online)'),
     ('find_osm_ids_local', 'Find OpenStreetMap IDs (Local PBF)'),
+    ('fetch_osm_ids', 'Fetch OpenStreetMap IDs (Online)'),
     # Add more tasks here as they're implemented
 ]
 
