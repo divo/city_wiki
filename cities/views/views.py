@@ -55,8 +55,14 @@ def execute_task(request, city_name, task_id):
                 'message': f'Unknown task: {task_id}'
             }, status=400)
 
-        # Start the task
-        task = task_func.delay(city.id)
+        # Get task arguments from request body
+        try:
+            task_args = json.loads(request.body) if request.body else {}
+        except json.JSONDecodeError:
+            task_args = {}
+
+        # Start the task with city_id and any additional arguments
+        task = task_func.delay(city.id, **task_args)
 
         return JsonResponse({
             'status': 'success',
@@ -64,8 +70,7 @@ def execute_task(request, city_name, task_id):
         })
 
     except Exception as e:
-        logger.error(f"Error executing task {
-                     task_id} for {city_name}: {str(e)}")
+        logger.error(f"Error executing task {task_id} for {city_name}: {str(e)}")
         return JsonResponse({
             'status': 'error',
             'message': str(e)

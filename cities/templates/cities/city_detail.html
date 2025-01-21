@@ -438,7 +438,9 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <button id="executeTask" class="btn btn-primary" disabled>Execute Task</button>
+                        <label for="taskArgs" class="form-label">Task Arguments (JSON):</label>
+                        <input type="text" id="taskArgs" class="form-control" placeholder='{"arg1": "value1"}'>
+                        <button id="executeTask" class="btn btn-primary mt-2" disabled>Execute Task</button>
                     </div>
                 </div>
                 
@@ -638,9 +640,26 @@ document.getElementById('executeTask').addEventListener('click', async function(
     document.getElementById('taskSelect').disabled = true;
     
     try {
+        // Parse task arguments
+        let taskArgs = {};
+        const argsInput = document.getElementById('taskArgs').value;
+        if (argsInput.trim()) {
+            try {
+                taskArgs = JSON.parse(argsInput);
+            } catch (e) {
+                showError('Invalid JSON in task arguments');
+                resetUI();
+                return;
+            }
+        }
+        
         // Start the task
         const response = await fetch(`/city/{{ city.name }}/tasks/${taskId}/execute/`, {
-            method: 'POST'
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(taskArgs)
         });
         
         const data = await response.json();
