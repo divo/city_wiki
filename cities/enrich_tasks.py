@@ -674,4 +674,70 @@ def find_osm_ids_local(city_id, pbf_file=None):
         logger.error(f"Error in find_osm_ids_local task: {str(e)}")
         raise
 
+@shared_task
+def find_duplicate_keys(city_id):
+    """
+    Find POIs with duplicate keys, where key is {name}-{latitude}-{longitude}.
+    Only considers POIs that have both latitude and longitude.
+    """
+    try:
+        city = City.objects.get(id=city_id)
+        logger.info(f"Starting duplicate key detection for {city.name}")
+        
+        # Get POIs with coordinates
+        pois = PointOfInterest.objects.filter(
+            city=city,
+            latitude__isnull=False,
+            longitude__isnull=False
+        ).values('id', 'name', 'latitude', 'longitude', 'category', 'district__name')
+        
+        # Group POIs by their key
+        poi_groups = {}
+        for poi in pois:
+            # Format coordinates to fixed precision to avoid floating point issues
+            lat = "{:.6f}".format(float(poi['latitude']))
+            lon = "{:.6f}".format(float(poi['longitude']))
+            name = str(poi['name'] or '')
+            
+            key = f"{name}-{lat}-{lon}"
+            if key not in poi_groups:
+                poi_groups[key] = []
+            poi_groups[key].append(poi)
+        
+        # Find groups with duplicates
+        duplicates = []
+        for key, group in poi_groups.items():
+            if len(group) > 1:
+                # Format POI info for display
+                poi_list = []
+                for poi in group:
+                    poi_name = str(poi['name'] or '')
+                    district = str(poi['district__name'] or 'Main City')
+                    
+                    poi_list.append({
+                        'id': int(poi['id']),
+                        'name': f"{poi_name} ({district})",
+                        'category': str(poi['category'] or ''),
+                        'latitude': "{:.6f}".format(float(poi['latitude'])),
+                        'longitude': "{:.6f}".format(float(poi['longitude']))
+                    })
+                
+                duplicates.append({
+                    'key': key,
+                    'count': len(group),
+                    'pois': poi_list
+                })
+        
+        logger.info(f"Found {len(duplicates)} duplicate key groups in {city.name}")
+        
+        return {
+            'status': 'success',
+            'message': f'Found {len(duplicates)} groups of POIs with duplicate keys',
+            'duplicates': duplicates
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in find_duplicate_keys task: {str(e)}")
+        raise
+
 # Data transformation tasks will be added here
