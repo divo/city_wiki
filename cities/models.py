@@ -105,6 +105,7 @@ class PointOfInterest(models.Model):
     hours = models.CharField(max_length=500, null=True, blank=True)
     image_file = models.ImageField(upload_to=poi_image_path, null=True, blank=True, help_text="Stored image file of this POI")
     rank = models.IntegerField(default=0)
+    osm_id = models.CharField(max_length=50, null=True, blank=True, help_text="OpenStreetMap ID for this POI")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -139,6 +140,7 @@ class PointOfInterest(models.Model):
         data['image_url'] = self.image_url
         if self.district:
             data['district'] = self.district.name
+        data['osm_id'] = self.osm_id
         return data
 
 class Validation(models.Model):
