@@ -54,6 +54,34 @@ def city_detail(request, city_name):
     # Get all districts for the filter dropdown
     districts = city.districts.all().order_by('name')
 
+    # Calculate additional statistics
+    stats = {
+        'total_pois': city.points_of_interest.count(),
+        'districts_count': city.districts.count(),
+        'category_counts': {},
+        'district_counts': {},
+        'missing_coords': city.points_of_interest.filter(latitude__isnull=True).count(),
+        'missing_address': city.points_of_interest.filter(address='').count() + city.points_of_interest.filter(address__isnull=True).count(),
+        'missing_both': city.points_of_interest.filter(
+            latitude__isnull=True,
+            address__isnull=True
+        ).count() + city.points_of_interest.filter(
+            latitude__isnull=True,
+            address=''
+        ).count(),
+        'missing_description': city.points_of_interest.filter(description='').count() + city.points_of_interest.filter(description__isnull=True).count()
+    }
+
+    # Count POIs by category
+    for category, name in PointOfInterest.CATEGORIES:
+        stats['category_counts'][category] = city.points_of_interest.filter(category=category).count()
+
+    # Count POIs by district
+    district_counts = city.points_of_interest.values('district__name').annotate(count=Count('id'))
+    for dc in district_counts:
+        district_name = dc['district__name'] or 'Main City'
+        stats['district_counts'][district_name] = dc['count']
+
     # Get all POIs for this city, organized by category
     pois_by_category = {}
     category_rank_counts = {}
@@ -98,6 +126,7 @@ def city_detail(request, city_name):
         'districts': districts,
         'selected_district': district_id,
         'enrichment_tasks': ENRICHMENT_TASKS,
+        'stats': stats,
     })
 
 
