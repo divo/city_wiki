@@ -291,6 +291,99 @@ def geocode_missing_addresses(city_id):
         raise
 
 @shared_task
+def geocode_missing_coordinates(city_id):
+    """
+    Find POIs with missing coordinates but have addresses, then use Mapbox to get their coordinates.
+    Processes one POI at a time to make the task resumable.
+    """
+    try:
+        city = City.objects.get(id=city_id)
+        logger.info(f"Starting coordinate geocoding for {city.name}")
+        
+        # Get POIs with addresses but no coordinates
+        pois = PointOfInterest.objects.filter(
+            city=city,
+            latitude__isnull=True,
+            address__isnull=False
+        ).exclude(address='')
+        
+        total_pois = pois.count()
+        processed_count = 0
+        updated_count = 0
+        
+        mapbox_token = os.environ.get('MAPBOX_TOKEN')
+        if not mapbox_token:
+            raise ValueError("MAPBOX_TOKEN environment variable not set")
+        
+        # Check if city has valid coordinates for proximity biasing
+        has_valid_coords = (
+            city.longitude is not None and 
+            city.latitude is not None and
+            -180 <= float(city.longitude) <= 180 and 
+            -90 <= float(city.latitude) <= 90
+        )
+        
+        for poi in pois:
+            try:
+                # Construct search query with POI name and address
+                search_text = f"{poi.name}, {poi.address}, {city.name}"
+                
+                # Base params
+                params = {
+                    'access_token': mapbox_token,
+                    'limit': 1,
+                    'types': 'address,poi',  # Look for both addresses and points of interest
+                }
+                
+                # Add proximity only if city has valid coordinates
+                if has_valid_coords:
+                    params['proximity'] = f"{city.longitude},{city.latitude}"
+                
+                # Call Mapbox Forward Geocoding API
+                response = requests.get(
+                    'https://api.mapbox.com/geocoding/v5/mapbox.places/' + search_text + '.json',
+                    params=params
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data['features']:
+                        # Get the first (most relevant) result
+                        feature = data['features'][0]
+                        coordinates = feature['geometry']['coordinates']
+                        
+                        # Update the POI with the new coordinates
+                        poi.longitude = coordinates[0]
+                        poi.latitude = coordinates[1]
+                        poi.save()
+                        updated_count += 1
+                        logger.info(f"Updated coordinates for POI {poi.name}: ({poi.latitude}, {poi.longitude})")
+                    else:
+                        logger.warning(f"No coordinates found for POI {poi.name} with address {poi.address}")
+                else:
+                    logger.error(f"Mapbox API error for POI {poi.name}: {response.text}")
+                
+            except Exception as e:
+                logger.error(f"Error processing POI {poi.name}: {str(e)}")
+            
+            processed_count += 1
+            
+            # Log progress every 10 POIs
+            if processed_count % 10 == 0:
+                logger.info(f"Processed {processed_count}/{total_pois} POIs")
+        
+        return {
+            'status': 'success',
+            'message': f'Processed {processed_count} POIs, updated {updated_count} coordinates',
+            'processed_count': processed_count,
+            'updated_count': updated_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in geocode_missing_coordinates task: {str(e)}")
+        raise
+
+@shared_task
 def geocode_city_coordinates(city_id):
     """
     Fetch coordinates for a city using Mapbox's geocoding API.

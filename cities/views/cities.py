@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 ENRICHMENT_TASKS = [
     ('normalize_categories', 'Normalize Categories'),
-    ('geocode_missing_addresses', 'Geocode Missing Addresses'),
+    ('geocode_city_coordinates', 'Lookup City Coordinates'),
+    ('geocode_missing_addresses', 'Lookup Missing Addresses from Coordinates'),
+    ('geocode_missing_coordinates', 'Lookup Missing Coordinates from Addresses'),
     ('dedup_main_city', 'Merge Duplicates in Main City'),
     ('find_all_duplicates', 'Find All Duplicates'),
     # Add more tasks here as they're implemented
