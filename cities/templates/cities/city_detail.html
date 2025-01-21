@@ -430,31 +430,15 @@
                 <div class="row align-items-end">
                     <div class="col-md-6">
                         <label for="taskSelect" class="form-label">Select Task:</label>
-                        <div class="input-group">
-                            <select class="form-control" id="taskSelect">
-                                <option value="">Select a task...</option>
-                                {% for task_id, task_name in enrichment_tasks %}
-                                    <option value="{{ task_id }}">{{ task_name }}</option>
-                                {% endfor %}
-                            </select>
-                            <div class="input-group-append">
-                                <button class="btn btn-primary" onclick="runSelectedTask()">Run Task</button>
-                            </div>
-                        </div>
+                        <select id="taskSelect" class="form-select">
+                            <option value="">Choose a task...</option>
+                            {% for task_id, task_name in enrichment_tasks %}
+                                <option value="{{ task_id }}">{{ task_name }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="col-md-6">
-                        <div class="input-group">
-                            <select class="form-control" id="pbfSelect" {% if not pbf_files %}disabled{% endif %}>
-                                {% if pbf_files %}
-                                    <option value="">Select a PBF file...</option>
-                                    {% for pbf_file in pbf_files %}
-                                        <option value="{{ pbf_file }}">{{ pbf_file }}</option>
-                                    {% endfor %}
-                                {% else %}
-                                    <option value="">No PBF files found in pbf directory</option>
-                                {% endif %}
-                            </select>
-                        </div>
+                        <button id="executeTask" class="btn btn-primary" disabled>Execute Task</button>
                     </div>
                 </div>
                 
@@ -638,69 +622,39 @@ document.querySelectorAll('.column-search').forEach(input => {
 let currentTaskId = null;
 let pollingInterval = null;
 
-function runSelectedTask() {
-    const taskId = document.getElementById('taskSelect').value;
-    if (!taskId) {
-        alert('Please select a task');
-        return;
-    }
+document.getElementById('taskSelect').addEventListener('change', function() {
+    const executeButton = document.getElementById('executeTask');
+    executeButton.disabled = !this.value;
+});
 
-    // Reset UI state
+document.getElementById('executeTask').addEventListener('click', async function() {
+    const taskId = document.getElementById('taskSelect').value;
+    if (!taskId) return;
+    
+    // Reset UI
     document.getElementById('taskResult').style.display = 'none';
     document.getElementById('taskStatus').style.display = 'block';
+    this.disabled = true;
     document.getElementById('taskSelect').disabled = true;
-    document.getElementById('duplicatesTable').style.display = 'none';
-
-    // If it's the local OSM task, require a PBF file
-    if (taskId === 'fetch_osm_ids_local') {
-        const pbfFile = document.getElementById('pbfSelect').value;
-        if (!pbfFile) {
-            alert('Please select a PBF file for local OSM ID lookup');
-            return;
-        }
-        runTask(taskId, { pbf_file: pbfFile });
-    } else {
-        runTask(taskId);
-    }
-}
-
-function runTask(taskId, extraParams = {}) {
-    // Show loading state
-    const button = document.querySelector('.task-section .btn-primary');
-    const originalText = button.textContent;
-    button.textContent = 'Running...';
-    button.disabled = true;
-
-    // Prepare the request data
-    const data = {
-        task: taskId,
-        ...extraParams
-    };
-
-    // Make the request
-    fetch(`/city/{{ city.name }}/tasks/${taskId}/execute/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': '{{ csrf_token }}'
-        },
-        body: JSON.stringify(data)
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'success') {
+    
+    try {
+        // Start the task
+        const response = await fetch(`/city/{{ city.name }}/tasks/${taskId}/execute/`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
             currentTaskId = data.task_id;
             startPolling();
         } else {
             showError(data.message || 'Failed to start task');
-            resetUI();
         }
-    })
-    .catch(error => {
-        showError('Error starting task: ' + error);
-        resetUI();
-    });
-}
+    } catch (error) {
+        showError('Error starting task: ' + error.message);
+    }
+});
 
 function startPolling() {
     if (pollingInterval) clearInterval(pollingInterval);
@@ -720,6 +674,7 @@ function startPolling() {
                 resetUI();
             }
             // Continue polling if status is 'processing'
+            
         } catch (error) {
             clearInterval(pollingInterval);
             showError('Error checking task status: ' + error.message);
@@ -775,14 +730,6 @@ function showSuccess(message, data) {
     }
 }
 
-function resetUI() {
-    const button = document.querySelector('.task-section .btn-primary');
-    button.textContent = 'Run Task';
-    button.disabled = false;
-    document.getElementById('taskSelect').disabled = false;
-    currentTaskId = null;
-}
-
 // Helper function to safely escape HTML
 function escapeHtml(unsafe) {
     return unsafe
@@ -793,11 +740,11 @@ function escapeHtml(unsafe) {
         .replace(/'/g, "&#039;");
 }
 
-// Add change handler for task select
-document.getElementById('taskSelect').addEventListener('change', function() {
-    const button = document.querySelector('.task-section .btn-primary');
-    button.disabled = !this.value;
-});
+function resetUI() {
+    document.getElementById('executeTask').disabled = false;
+    document.getElementById('taskSelect').disabled = false;
+    currentTaskId = null;
+}
 
 async function fetchImages() {
     const container = document.querySelector('.city-image-container');
