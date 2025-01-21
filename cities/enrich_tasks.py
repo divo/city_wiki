@@ -7,6 +7,7 @@ import logging
 from difflib import SequenceMatcher
 from django.db.models import Q
 import requests
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +215,79 @@ def dedup_main_city(city_id):
         
     except Exception as e:
         logger.error(f"Error in dedup_main_city task: {str(e)}")
+        raise
+
+@shared_task
+def geocode_missing_addresses(city_id):
+    """
+    Find POIs with missing addresses but have coordinates, then use Mapbox to get their addresses.
+    Processes one POI at a time to make the task resumable.
+    """
+    try:
+        city = City.objects.get(id=city_id)
+        logger.info(f"Starting address geocoding for {city.name}")
+        
+        # Get POIs with coordinates but no address
+        pois = PointOfInterest.objects.filter(
+            city=city,
+            latitude__isnull=False,
+            longitude__isnull=False
+        ).filter(Q(address='') | Q(address__isnull=True))
+        
+        total_pois = pois.count()
+        processed_count = 0
+        updated_count = 0
+        
+        mapbox_token = os.environ.get('MAPBOX_TOKEN')
+        if not mapbox_token:
+            raise ValueError("MAPBOX_TOKEN environment variable not set")
+        
+        for poi in pois:
+            try:
+                # Call Mapbox Reverse Geocoding API
+                response = requests.get(
+                    f'https://api.mapbox.com/geocoding/v5/mapbox.places/{poi.longitude},{poi.latitude}.json',
+                    params={
+                        'access_token': mapbox_token,
+                        'types': 'address',
+                        'limit': 1
+                    }
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data['features']:
+                        # Get the first (most relevant) result
+                        feature = data['features'][0]
+                        
+                        # Update the POI with the new address
+                        poi.address = feature['place_name']
+                        poi.save()
+                        updated_count += 1
+                        logger.info(f"Updated address for POI {poi.name}: {poi.address}")
+                    else:
+                        logger.warning(f"No address found for POI {poi.name} at coordinates {poi.latitude}, {poi.longitude}")
+                else:
+                    logger.error(f"Mapbox API error for POI {poi.name}: {response.text}")
+                
+            except Exception as e:
+                logger.error(f"Error processing POI {poi.name}: {str(e)}")
+            
+            processed_count += 1
+            
+            # Log progress every 10 POIs
+            if processed_count % 10 == 0:
+                logger.info(f"Processed {processed_count}/{total_pois} POIs")
+        
+        return {
+            'status': 'success',
+            'message': f'Processed {processed_count} POIs, updated {updated_count} addresses',
+            'processed_count': processed_count,
+            'updated_count': updated_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in geocode_missing_addresses task: {str(e)}")
         raise
 
 # Data transformation tasks will be added here
