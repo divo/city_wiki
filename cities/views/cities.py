@@ -28,7 +28,8 @@ ENRICHMENT_TASKS = [
     ('geocode_missing_coordinates', 'Lookup Missing Coordinates from Addresses'),
     ('dedup_main_city', 'Merge Duplicates in Main City'),
     ('find_all_duplicates', 'Find All Duplicates'),
-    ('fetch_osm_ids', 'Fetch OpenStreetMap IDs'),
+    ('fetch_osm_ids', 'Fetch OpenStreetMap IDs (Online)'),
+    ('find_osm_ids_local', 'Find OpenStreetMap IDs (Local PBF)'),
     # Add more tasks here as they're implemented
 ]
 

@@ -9,6 +9,10 @@ from django.db.models import Q
 import requests
 import os
 import time
+import geopy.distance
+import pandas as pd
+from shapely.geometry import Point
+import geopandas as gpd
 
 logger = logging.getLogger(__name__)
 
@@ -535,6 +539,139 @@ def fetch_osm_ids(city_id):
         
     except Exception as e:
         logger.error(f"Error in fetch_osm_ids task: {str(e)}")
+        raise
+
+@shared_task
+def find_osm_ids_local(city_id, pbf_file=None):
+    """
+    Find POIs without OSM IDs by searching a local OSM PBF file using Pyrosm.
+    Searches for nodes within 5 meters of each POI's coordinates.
+    
+    Args:
+        city_id: ID of the city to process
+        pbf_file: Path to the local OSM PBF file
+    """
+    try:
+        if not pbf_file:
+            raise ValueError("No PBF file path provided")
+            
+        import os
+        if not os.path.isfile(pbf_file):
+            raise ValueError(f"PBF file not found at path: {pbf_file}")
+            
+        from pyrosm import OSM
+        from shapely.geometry import Point
+        import geopandas as gpd
+        import pandas as pd
+        
+        city = City.objects.get(id=city_id)
+        logger.info(f"Starting local OSM ID lookup for {city.name} using PBF file: {pbf_file}")
+        
+        # Get POIs without OSM IDs but with coordinates
+        pois = PointOfInterest.objects.filter(
+            city=city,
+            osm_id__isnull=True,
+            latitude__isnull=False,
+            longitude__isnull=False
+        )
+        
+        total_pois = pois.count()
+        if total_pois == 0:
+            logger.info(f"No POIs in {city.name} need OSM IDs")
+            return {
+                'status': 'success',
+                'message': 'No POIs need OSM IDs',
+                'processed_count': 0,
+                'updated_count': 0
+            }
+        
+        logger.info(f"Found {total_pois} POIs to process in {city.name}")
+        
+        # Initialize Pyrosm and load the data
+        logger.info("Loading OSM data with Pyrosm...")
+        osm = OSM(pbf_file)
+        osm_pois = osm.get_pois()
+        logger.info(f"Loaded {len(osm_pois)} POIs from OSM")
+        
+        # Ensure OSM POIs are in WGS 84
+        osm_pois = osm_pois.to_crs("EPSG:4326")
+        
+        # Process each POI
+        processed_count = 0
+        updated_count = 0
+        radius = 5  # 5 meters
+        radius_degrees = radius / 111139.0  # Convert meters to degrees
+        
+        for poi in pois:
+            logger.info(
+                f"\nProcessing POI {processed_count + 1}/{total_pois}:\n"
+                f"  Name: {poi.name}\n"
+                f"  Category: {poi.category}\n"
+                f"  Location: ({poi.latitude}, {poi.longitude})"
+            )
+            
+            try:
+                # Create a GeoDataFrame for the target point
+                target_point = gpd.GeoDataFrame(
+                    {"geometry": [Point(poi.longitude, poi.latitude)]},
+                    crs="EPSG:4326"
+                )
+                
+                # Calculate distances and filter nearby POIs
+                distances = osm_pois.geometry.distance(target_point.iloc[0].geometry)
+                nearby = osm_pois[distances <= radius_degrees].copy()
+                nearby['distance'] = distances[distances <= radius_degrees] * 111139.0  # Convert back to meters
+                
+                if not nearby.empty:
+                    # Sort by distance and get the closest
+                    nearby = nearby.sort_values('distance')
+                    closest = nearby.iloc[0]
+                    
+                    # Get OSM ID and type
+                    osm_id = str(closest['id'])
+                    osm_type = closest['type'] if 'type' in closest else 'node'
+                    
+                    # Update the POI
+                    poi.osm_id = f"{osm_type}/{osm_id}"
+                    poi.save()
+                    updated_count += 1
+                    
+                    # Log the match with details
+                    tags = {col: closest[col] for col in closest.index if pd.notna(closest[col]) and col not in ['geometry', 'id', 'distance']}
+                    logger.info(
+                        f"✅ Found match for {poi.name}:\n"
+                        f"  OSM: {poi.osm_id}\n"
+                        f"  Distance: {closest['distance']:.2f}m\n"
+                        f"  Tags: {tags}"
+                    )
+                else:
+                    logger.warning(f"❌ No matches found for {poi.name}")
+                    
+            except Exception as e:
+                logger.error(f"Error processing POI {poi.name}: {str(e)}")
+                
+            processed_count += 1
+            if processed_count % 10 == 0:
+                logger.info(
+                    f"\nProgress update:\n"
+                    f"- Processed: {processed_count}/{total_pois} POIs\n"
+                    f"- Matches found: {updated_count}"
+                )
+        
+        logger.info(f"\nTask complete for {city.name}:")
+        logger.info(f"- Total POIs processed: {processed_count}")
+        logger.info(f"- POIs updated with OSM IDs: {updated_count}")
+        logger.info(f"- POIs without matches: {processed_count - updated_count}")
+        
+        return {
+            'status': 'success',
+            'message': f'Processed {processed_count} POIs, updated {updated_count} with OSM IDs',
+            'processed_count': processed_count,
+            'updated_count': updated_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in find_osm_ids_local task: {str(e)}")
         raise
 
 # Data transformation tasks will be added here
