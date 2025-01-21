@@ -41,6 +41,7 @@
         .poi-table td:nth-child(11) { width: 7%; }  /* Website */
         .poi-table td:nth-child(12) { width: 7%; }  /* OSM ID */
         .poi-table td:nth-child(13) { width: 7%; }  /* Created at */
+        .poi-table td:nth-child(14) { width: 3%; }  /* Actions */
         
         .btn-sm {
             padding: 0.25rem 0.5rem;
@@ -265,6 +266,19 @@
             border-color: #17a2b8;
             box-shadow: 0 0 0 2px rgba(23, 162, 184, 0.25);
         }
+
+        /* Add styles for delete button */
+        .delete-btn {
+            color: #dc3545;
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            margin-left: 4px;
+        }
+        .delete-btn:hover {
+            color: #bd2130;
+        }
     </style>
 
     <div id="selectionActions" class="selection-actions" style="display: none; margin-bottom: 1em;">
@@ -390,8 +404,11 @@
                         </td>
                         <td {% if not poi.created_at %}class="empty-cell"{% endif %}>{{ poi.created_at|default:"" }}</td>
                         <td>
-                            <a href="{% url 'poi_history' city.name poi.id %}" class="btn btn-sm btn-info">History</a>
-                            <button onclick="openEditModal({{ poi.id }}, '{{ poi.name|escapejs }}', '{{ poi.category }}', '{{ poi.sub_category|escapejs }}', '{{ poi.description|escapejs }}', '{{ poi.latitude|default:'' }}', '{{ poi.longitude|default:'' }}', '{{ poi.address|escapejs|default:'' }}', '{{ poi.phone|escapejs|default:'' }}', '{{ poi.website|escapejs|default:'' }}', '{{ poi.hours|escapejs|default:'' }}', {{ poi.rank|default:0 }}, {{ poi.district.id }})" class="btn btn-sm btn-primary">Edit</button>
+                            <div class="btn-group">
+                                <a href="{% url 'poi_history' city.name poi.id %}" class="btn btn-sm btn-info">History</a>
+                                <button onclick="openEditModal({{ poi.id }}, '{{ poi.name|escapejs }}', '{{ poi.category }}', '{{ poi.sub_category|escapejs }}', '{{ poi.description|escapejs }}', '{{ poi.latitude|default:'' }}', '{{ poi.longitude|default:'' }}', '{{ poi.address|escapejs|default:'' }}', '{{ poi.phone|escapejs|default:'' }}', '{{ poi.website|escapejs|default:'' }}', '{{ poi.hours|escapejs|default:'' }}', {{ poi.rank|default:0 }}, {{ poi.district.id|default:'null' }})" class="btn btn-sm btn-primary">Edit</button>
+                                <button class="btn btn-sm btn-danger" onclick="deletePoi({{ poi.id }}, '{{ poi.name|escapejs }}')">Delete</button>
+                            </div>
                         </td>
                     </tr>
                 {% endfor %}
@@ -902,6 +919,39 @@
             } catch (error) {
                 alert('Error creating list: ' + error);
             }
+        }
+
+        function deletePoi(poiId, poiName) {
+            if (!confirm(`Are you sure you want to delete "${poiName}"?`)) {
+                return;
+            }
+            
+            fetch(`/city/{{ city.name }}/poi/${poiId}/delete/`, {
+                method: 'DELETE'
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.status === 'success') {
+                    var row = document.querySelector('input[value="' + poiId + '"]').closest('tr');
+                    row.remove();
+                    
+                    var alert = document.createElement('div');
+                    alert.className = 'alert alert-success';
+                    alert.textContent = data.message;
+                    document.querySelector('.container').insertBefore(alert, document.querySelector('.table-responsive'));
+                    
+                    setTimeout(function() {
+                        alert.remove();
+                    }, 3000);
+                } else {
+                    alert('Error deleting POI: ' + data.message);
+                }
+            })
+            .catch(function(error) {
+                alert('Error deleting POI: ' + error);
+            });
         }
     </script>
 {% else %}

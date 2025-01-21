@@ -27,6 +27,7 @@ from .pois import (
     poi_edit,
     poi_detail,
     poi_merge,
+    delete_poi,
 )
 
 from .images import (

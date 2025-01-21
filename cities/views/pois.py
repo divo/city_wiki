@@ -341,4 +341,31 @@ def delete_poi_image(request, city_name, poi_id):
         }, status=500)
 
 
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def delete_poi(request, city_name, poi_id):
+    """Delete a POI."""
+    try:
+        city = get_object_or_404(City, name=city_name)
+        poi = get_object_or_404(PointOfInterest, id=poi_id, city=city)
+        
+        # Store the name before deletion for the message
+        poi_name = poi.name
+        
+        # Delete the POI
+        poi.delete()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Deleted POI: {poi_name}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting POI {poi_id}: {str(e)}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
 
