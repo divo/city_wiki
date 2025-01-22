@@ -311,6 +311,7 @@
 <div class="container">
     <div class="city-header">
         <h1>{{ city.name }}</h1>
+        <a href="{% url 'export_city' city.name %}" class="btn btn-primary">Export City Data</a>
         {% if city.latitude and city.longitude %}
             <p class="coordinates">📍 {{ city.latitude|floatformat:4 }}, {{ city.longitude|floatformat:4 }}</p>
         {% else %}

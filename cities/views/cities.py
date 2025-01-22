@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from django.core.files import File
 from django.core.files.temp import NamedTemporaryFile
 from django.conf import settings
+import shutil
 
 from ..models import City, PointOfInterest
 from ..fetch_tasks import import_city_data
@@ -418,3 +419,49 @@ def update_about(request, city_name):
             'status': 'error',
             'message': str(e)
         }, status=400)
+
+@require_http_methods(["GET"])
+def export_city(request, city_name):
+    """Export city data to a directory structure in the output directory."""
+    try:
+        # Create output directory if it doesn't exist
+        output_dir = os.path.join(settings.BASE_DIR, 'output')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Create or clean city directory
+        city_dir = os.path.join(output_dir, city_name)
+        if os.path.exists(city_dir):
+            shutil.rmtree(city_dir)  # Remove directory and all its contents
+        os.makedirs(city_dir)  # Create fresh directory
+        
+        # Create media subdirectory
+        media_dir = os.path.join(city_dir, 'media', 'cities', 'images')
+
+        os.makedirs(media_dir)
+        
+        # Build and write JSON data
+        data = _build_city_json(city_name, base_url=None)
+        json_path = os.path.join(city_dir, f'{city_name}.json')
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, cls=DjangoJSONEncoder, indent=2)
+            
+        # Copy city image if it exists
+        city = get_object_or_404(City, name=city_name)
+        if city.image_file:
+            src_path = city.image_file.path
+            dst_path = os.path.join(media_dir, os.path.basename(src_path))
+            if os.path.exists(src_path):
+                shutil.copy2(src_path, dst_path)
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': f'City data exported to {city_dir}',
+            'directory': city_dir
+        })
+
+    except Exception as e:
+        logger.error(f"Error exporting city data: {str(e)}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
