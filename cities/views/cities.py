@@ -217,6 +217,19 @@ def import_city(request):
 def dump_city(request, city_name):
     """Return a JSON dump of all data for a specific city."""
     try:
+        data = _build_city_json(city_name)
+        return JsonResponse(data, encoder=DjangoJSONEncoder, json_dumps_params={'indent': 2})
+
+    except Exception as e:
+        logger.error(f"Error dumping city data: {str(e)}")
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+
+def _build_city_json(city_name):
+    try:
         city = get_object_or_404(City, name=city_name)
         
         data = {
@@ -246,15 +259,13 @@ def dump_city(request, city_name):
                 'pois': [poi.to_dict() for poi in poi_list.pois.all()]
             }
             data['poi_lists'].append(list_data)
-
-        return JsonResponse(data, encoder=DjangoJSONEncoder, json_dumps_params={'indent': 2})
-
+        
+        return data
     except Exception as e:
-        logger.error(f"Error dumping city data: {str(e)}")
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=500)
+        logger.error(f"Error building city JSON: {str(e)}")
+        return None
+
+
 
 
 @require_http_methods(["GET"])
