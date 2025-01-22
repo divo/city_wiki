@@ -59,7 +59,7 @@ class City(models.Model):
     def get_image_url(self, base_url=None):
         """Return the URL for the image file if it exists."""
         if self.image_file:
-            return f'{base_url}{self.image_file.url}'
+            return f'{base_url or ""}{self.image_file.url}'
         return None
 
     def to_dict(self, base_url=None):
@@ -139,7 +139,7 @@ class PointOfInterest(models.Model):
     def get_image_url(self, base_url=None):
         """Return the URL for the image file if it exists."""
         if self.image_file:
-            return f'{base_url}{self.image_file.url}'
+            return f'{base_url or ""}{self.image_file.url}'
         return None
 
     def to_dict(self, base_url=None):
