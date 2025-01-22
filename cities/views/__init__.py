@@ -11,7 +11,8 @@ from .cities import (
     fetch_city_image,
     save_city_image,
     delete_city_image,
-    update_about
+    update_about,
+    export_city
 )
 
 from .lists import (

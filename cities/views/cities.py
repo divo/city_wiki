@@ -218,7 +218,7 @@ def import_city(request):
 def dump_city(request, city_name):
     """Return a JSON dump of all data for a specific city."""
     try:
-        data = _build_city_json(city_name)
+        data = _build_city_json(city_name, base_url=settings.BASE_URL)
         return JsonResponse(data, encoder=DjangoJSONEncoder, json_dumps_params={'indent': 2})
 
     except Exception as e:
@@ -229,12 +229,12 @@ def dump_city(request, city_name):
         }, status=500)
 
 
-def _build_city_json(city_name):
+def _build_city_json(city_name, base_url=None):
     try:
         city = get_object_or_404(City, name=city_name)
         
         data = {
-            'city': city.to_dict(base_url=settings.BASE_URL),
+            'city': city.to_dict(base_url=base_url),
             'districts': [],
             'points_of_interest': [],
             'poi_lists': []
@@ -249,7 +249,7 @@ def _build_city_json(city_name):
 
         # Add POIs - only those with coordinates
         for poi in city.points_of_interest.filter(latitude__isnull=False, longitude__isnull=False):
-            data['points_of_interest'].append(poi.to_dict(base_url=settings.BASE_URL))
+            data['points_of_interest'].append(poi.to_dict(base_url=base_url))
 
         # Add POI lists
         for poi_list in city.poi_lists.all():
@@ -257,7 +257,7 @@ def _build_city_json(city_name):
                 'title': poi_list.title,
                 'created_at': poi_list.created_at,
                 'updated_at': poi_list.updated_at,
-                'pois': [poi.to_dict(base_url=settings.BASE_URL) for poi in poi_list.pois.all()]
+                'pois': [poi.to_dict(base_url=base_url) for poi in poi_list.pois.all()]
             }
             data['poi_lists'].append(list_data)
         
