@@ -136,7 +136,7 @@ class PointOfInterest(models.Model):
 
     def to_dict(self):
         """Convert the model instance to a dictionary, handling special fields."""
-        data = model_to_dict(self, exclude=['id', 'city', 'image_file'])
+        data = model_to_dict(self, exclude=['city', 'image_file'])
         data['image_url'] = self.image_url
         if self.district:
             data['district'] = self.district.name
