@@ -51,6 +51,11 @@ class City(models.Model):
             self.image_file = None
             self.save()
 
+    # Use by the admin site
+    @property
+    def image_url(self):
+        return self.get_image_url(base_url=settings.BASE_URL)
+
     def get_image_url(self, base_url=None):
         """Return the URL for the image file if it exists."""
         if self.image_file:
@@ -125,6 +130,11 @@ class PointOfInterest(models.Model):
                 os.remove(self.image_file.path)
             self.image_file = None
             self.save()
+
+    # Use by the admin site
+    @property
+    def image_url(self):
+        return self.get_image_url(base_url=settings.BASE_URL)
 
     def get_image_url(self, base_url=None):
         """Return the URL for the image file if it exists."""
