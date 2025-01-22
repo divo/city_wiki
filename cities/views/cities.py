@@ -434,10 +434,11 @@ def export_city(request, city_name):
             shutil.rmtree(city_dir)  # Remove directory and all its contents
         os.makedirs(city_dir)  # Create fresh directory
         
-        # Create media subdirectory
-        media_dir = os.path.join(city_dir, 'media', 'cities', 'images')
-
-        os.makedirs(media_dir)
+        # Create media subdirectories
+        media_dir = os.path.join(city_dir, 'media', 'cities')
+        city_images_dir = os.path.join(media_dir, 'images')
+        poi_images_dir = os.path.join(city_images_dir, 'pois')
+        os.makedirs(poi_images_dir)
         
         # Build and write JSON data
         data = _build_city_json(city_name, base_url=None)
@@ -449,9 +450,17 @@ def export_city(request, city_name):
         city = get_object_or_404(City, name=city_name)
         if city.image_file:
             src_path = city.image_file.path
-            dst_path = os.path.join(media_dir, os.path.basename(src_path))
+            dst_path = os.path.join(city_images_dir, os.path.basename(src_path))
             if os.path.exists(src_path):
                 shutil.copy2(src_path, dst_path)
+        
+        # Copy POI images
+        for poi in city.points_of_interest.all():
+            if poi.image_file:
+                src_path = poi.image_file.path
+                dst_path = os.path.join(poi_images_dir, os.path.basename(src_path))
+                if os.path.exists(src_path):
+                    shutil.copy2(src_path, dst_path)
         
         return JsonResponse({
             'status': 'success',
