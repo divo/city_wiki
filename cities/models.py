@@ -51,17 +51,16 @@ class City(models.Model):
             self.image_file = None
             self.save()
 
-    @property
-    def image_url(self):
+    def get_image_url(self, base_url=None):
         """Return the URL for the image file if it exists."""
         if self.image_file:
-            return f'{settings.BASE_URL}{self.image_file.url}'
+            return f'{base_url}{self.image_file.url}'
         return None
 
-    def to_dict(self):
+    def to_dict(self, base_url=None):
         """Convert the model instance to a dictionary, handling special fields."""
         data = model_to_dict(self, exclude=['image_file'])
-        data['image_url'] = self.image_url
+        data['image_url'] = self.get_image_url(base_url=base_url)
         return data
 
 @reversion.register()
@@ -127,17 +126,16 @@ class PointOfInterest(models.Model):
             self.image_file = None
             self.save()
 
-    @property
-    def image_url(self):
+    def get_image_url(self, base_url=None):
         """Return the URL for the image file if it exists."""
         if self.image_file:
-            return f'{settings.BASE_URL}{self.image_file.url}'
+            return f'{base_url}{self.image_file.url}'
         return None
 
-    def to_dict(self):
+    def to_dict(self, base_url=None):
         """Convert the model instance to a dictionary, handling special fields."""
         data = model_to_dict(self, exclude=['city', 'image_file'])
-        data['image_url'] = self.image_url
+        data['image_url'] = self.get_image_url(base_url=base_url)
         if self.district:
             data['district'] = self.district.name
         data['osm_id'] = self.osm_id

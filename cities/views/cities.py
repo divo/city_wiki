@@ -12,6 +12,7 @@ import requests
 from urllib.parse import urlparse
 from django.core.files import File
 from django.core.files.temp import NamedTemporaryFile
+from django.conf import settings
 
 from ..models import City, PointOfInterest
 from ..fetch_tasks import import_city_data
@@ -233,7 +234,7 @@ def _build_city_json(city_name):
         city = get_object_or_404(City, name=city_name)
         
         data = {
-            'city': city.to_dict(),
+            'city': city.to_dict(base_url=settings.BASE_URL),
             'districts': [],
             'points_of_interest': [],
             'poi_lists': []
@@ -248,7 +249,7 @@ def _build_city_json(city_name):
 
         # Add POIs - only those with coordinates
         for poi in city.points_of_interest.filter(latitude__isnull=False, longitude__isnull=False):
-            data['points_of_interest'].append(poi.to_dict())
+            data['points_of_interest'].append(poi.to_dict(base_url=settings.BASE_URL))
 
         # Add POI lists
         for poi_list in city.poi_lists.all():
@@ -256,7 +257,7 @@ def _build_city_json(city_name):
                 'title': poi_list.title,
                 'created_at': poi_list.created_at,
                 'updated_at': poi_list.updated_at,
-                'pois': [poi.to_dict() for poi in poi_list.pois.all()]
+                'pois': [poi.to_dict(base_url=settings.BASE_URL) for poi in poi_list.pois.all()]
             }
             data['poi_lists'].append(list_data)
         
@@ -264,8 +265,6 @@ def _build_city_json(city_name):
     except Exception as e:
         logger.error(f"Error building city JSON: {str(e)}")
         return None
-
-
 
 
 @require_http_methods(["GET"])
