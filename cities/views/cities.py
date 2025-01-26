@@ -441,7 +441,7 @@ def export_city(request, city_name):
         os.makedirs(poi_images_dir)
         
         # Build and write JSON data
-        data = _build_city_json(city_name, base_url=None)
+        data = _build_city_json(city_name, base_url=f'{city_name}')
         json_path = os.path.join(city_dir, f'{city_name}.json')
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, cls=DjangoJSONEncoder, indent=2)
