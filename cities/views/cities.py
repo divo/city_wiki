@@ -458,7 +458,9 @@ def export_city(request, city_name):
         for poi in city.points_of_interest.all():
             if poi.image_file:
                 src_path = poi.image_file.path
-                dst_path = os.path.join(poi_images_dir, os.path.basename(src_path))
+                clean_city = city.name.replace(' ', '_').lower()
+                dst_path = os.path.join(poi_images_dir, clean_city, os.path.basename(src_path))
+                os.makedirs(os.path.dirname(dst_path), exist_ok=True)
                 if os.path.exists(src_path):
                     shutil.copy2(src_path, dst_path)
         
