@@ -19,36 +19,35 @@ def generate_reword(request):
                     'message': 'No text provided'
                 }, status=400)
 
-            # Format prompt for rewording
-            prompt = f"""Rewrite this text in a different way while preserving its meaning:
+            messages = [
+                {
+                    "role": "system",
+                    "content": "Act as an editor for a travel guide. Your task is to rewrite the input text describing a tourist attraction, making it more consistent and relevant to a reader of a travel guide. It should be rewritten in a more consistent tone, with a more professional style. Remove any extraneous or overly specific information not relevant to someone just looking to get an overview of the attraction.The tone should remain professional, but friendly and approachable."
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ]
 
-{text}
-
-Rewritten version:"""
-
-            f.write(f"Sending reword request with prompt: {prompt}\n")
-            response = requests.post('http://localhost:8080/completion', 
+            f.write(f"Sending chat request with messages: {messages}\n")
+            response = requests.post('http://localhost:8080/v1/chat/completions', 
                 json={
-                    "prompt": prompt,
-                    "temperature": 0.7,  # Balanced creativity
-                    "top_k": 40,
-                    "top_p": 0.9,
-                    "n_predict": 500,  # Shorter for rewording
-                    "stop": ["\n\n", "###", "Rewritten version:", "Original text:"],
+                    "messages": messages,
+                    "temperature": 0.7,
+                    "max_tokens": 4000,
                     "presence_penalty": 0.1,
                     "frequency_penalty": 0.1,
-                    "cache_prompt": True,
-                    "samplers": ["top_k", "top_p", "temperature"],
                     "stream": False
                 },
-                timeout=30
+                timeout=120
             )
 
             response.raise_for_status()
             data = response.json()
             
-            # Clean up the response
-            content = data.get('content', '').strip()
+            # Clean up the response - chat completions return message content
+            content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
             
             f.write(f"Received reworded response: {content}\n")
             return JsonResponse({

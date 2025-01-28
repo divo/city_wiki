@@ -7,7 +7,6 @@ from django.conf import settings
 from openai import OpenAI
 from ..models import City
 import logging
-import requests
 
 logger = logging.getLogger(__name__)
 
