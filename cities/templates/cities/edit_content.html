@@ -111,6 +111,31 @@
         max-width: 400px;  /* Prevent descriptions from getting too wide */
         white-space: pre-wrap;  /* Preserve whitespace and wrap text */
     }
+
+    .save-btn {
+        padding: 0.375rem 0.75rem;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 0.25rem;
+        cursor: pointer;
+        margin-top: 0.5rem;
+        display: none;
+    }
+
+    .save-btn:hover {
+        background-color: #218838;
+    }
+
+    .save-btn:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+    }
+
+    .description-cell {
+        display: flex;
+        flex-direction: column;
+    }
 </style>
 
 <div class="container">
@@ -246,17 +271,26 @@ document.getElementById('poiListSelect').addEventListener('change', function(e) 
     poiTableBody.innerHTML = '';
     list.pois.forEach(poi => {
         const row = document.createElement('tr');
+        const hasDescription = poi.description && poi.description.trim();
         row.innerHTML = `
             <td>${poi.name}</td>
             <td class="description">${poi.description || ''}</td>
-            <td class="description reworded"></td>
+            <td class="description description-cell">
+                <div class="reworded"></div>
+                <button 
+                    class="save-btn" 
+                    onclick="saveDescription(${poi.id}, this)"
+                    style="display: none;"
+                >
+                    Save Description
+                </button>
+            </td>
             <td>
                 <button 
                     class="reword-btn" 
                     onclick="rewordDescription(${poi.id}, '${poi.name}', this)"
-                    ${!poi.description ? 'disabled' : ''}
                 >
-                    Reword Description
+                    ${hasDescription ? 'Reword Description' : 'Create Description'}
                 </button>
             </td>
         `;
@@ -314,13 +348,16 @@ document.getElementById('rewordForm').addEventListener('submit', async function(
 async function rewordDescription(poiId, poiName, button) {
     const row = button.closest('tr');
     const description = row.querySelector('td:nth-child(2)').textContent;
-    const rewordedCell = row.querySelector('td.reworded');
+    const rewordedCell = row.querySelector('td.description-cell');
+    const rewordedText = rewordedCell.querySelector('.reworded');
+    const saveButton = rewordedCell.querySelector('.save-btn');
     const originalButton = button.textContent;
     
     // Disable button and show loading state
     button.disabled = true;
     button.textContent = 'Rewording...';
-    rewordedCell.textContent = 'Generating...';
+    rewordedText.textContent = 'Generating...';
+    saveButton.style.display = 'none';
     
     try {
         const response = await fetch('/generate/reword/', {
@@ -336,16 +373,55 @@ async function rewordDescription(poiId, poiName, button) {
         
         if (data.content) {
             // Update the reworded description cell with the new content
-            rewordedCell.textContent = data.content;
+            rewordedText.textContent = data.content;
+            saveButton.style.display = 'block';
         } else if (data.message) {
-            rewordedCell.textContent = 'Error: ' + data.message;
+            rewordedText.textContent = 'Error: ' + data.message;
         }
     } catch (error) {
-        rewordedCell.textContent = 'Error: ' + error.message;
+        rewordedText.textContent = 'Error: ' + error.message;
     } finally {
         // Reset button state
         button.disabled = false;
         button.textContent = originalButton;
+    }
+}
+
+async function saveDescription(poiId, saveButton) {
+    const row = saveButton.closest('tr');
+    const rewordedText = row.querySelector('.reworded').textContent;
+    const originalCell = row.querySelector('td:nth-child(2)');
+    
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving...';
+    
+    try {
+        const response = await fetch(`/city/poi/${poiId}/update_description/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: `description=${encodeURIComponent(rewordedText)}`
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            // Update the original description cell
+            originalCell.textContent = rewordedText;
+            // Hide the save button
+            saveButton.style.display = 'none';
+            // Clear the reworded text
+            row.querySelector('.reworded').textContent = '';
+        } else {
+            alert('Error saving description: ' + data.message);
+        }
+    } catch (error) {
+        alert('Error saving description: ' + error.message);
+    } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = 'Save Description';
     }
 }
 </script>

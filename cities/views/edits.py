@@ -5,10 +5,11 @@ import re
 import json
 import requests
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.core.serializers.json import DjangoJSONEncoder
+from django.views.decorators.http import require_http_methods
 from groq import Groq
-from ..models import City, PoiList
+from ..models import City, PoiList, PointOfInterest
 
 def edit_content_view(request):
     """Render the edit content interface."""
@@ -106,20 +107,23 @@ def edit_content_view(request):
 
 
 def generate_reword(request):
-    """Send text to Groq's API for rewording."""
+    """Send text to Groq's API for rewording or creating new descriptions."""
     try:
         text = request.POST.get('text', '')
         name = request.POST.get('name', '')
-        if not text:
+        
+        if not name:
             return JsonResponse({
                 'status': 'error',
-                'message': 'No text provided'
+                'message': 'No POI name provided'
             }, status=400)
 
         client = Groq(api_key=os.environ.get('GROQ_KEY'))
-        completion = client.chat.completions.create(
-            model="deepseek-r1-distill-llama-70b",
-            messages=[
+        
+        # Different prompts based on whether we're rewriting or creating new
+        if text.strip():
+            # Rewriting existing description
+            messages = [
                 {
                     "role": "system",
                     "content": (
@@ -136,7 +140,32 @@ def generate_reword(request):
                     "role": "user",
                     "content": f"Please rewrite this description of {name}:\n\n{text}"
                 }
-            ],
+            ]
+        else:
+            # Creating new description
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "Act as a travel writer for a guide book. Your task is to write a new description "
+                        "for a tourist attraction. The description should be informative, engaging, and relevant "
+                        "to readers of a travel guide. Write in a professional yet approachable style. "
+                        "Since we don't have specific details, focus on creating a general, inviting description "
+                        "that encourages visitors to explore the attraction. Use multiple paragraphs to break up the text. "
+                        "Do not include any markdown or html in the response. Do not include the attraction's name as a title, "
+                        "but you can use it in the description. Keep the description general but enticing, since we don't have "
+                        "specific details about opening hours, prices, or exact features."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": f"Please write a new description for a tourist attraction named {name}."
+                }
+            ]
+
+        completion = client.chat.completions.create(
+            model="deepseek-r1-distill-llama-70b",
+            messages=messages,
             temperature=0.6,
             max_completion_tokens=4096,
             top_p=0.95,
@@ -151,6 +180,32 @@ def generate_reword(request):
         
         return JsonResponse({
             'content': content
+        })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500) 
+
+@require_http_methods(["POST"])
+def update_poi_description(request, poi_id):
+    """Update a POI's description."""
+    try:
+        poi = get_object_or_404(PointOfInterest, id=poi_id)
+        description = request.POST.get('description', '').strip()
+        
+        if not description:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No description provided'
+            }, status=400)
+        
+        poi.description = description
+        poi.save()
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Description updated successfully'
         })
     except Exception as e:
         return JsonResponse({

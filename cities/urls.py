@@ -37,4 +37,5 @@ urlpatterns = [
     path('city/<str:city_name>/delete_image/', views.delete_city_image, name='delete_city_image'),
     path('city/<str:city_name>/update_about/', views.update_about, name='update_about'),
     path('city/<str:city_name>/export/', views.export_city, name='export_city'),
+    path('city/poi/<int:poi_id>/update_description/', edits.update_poi_description, name='update_poi_description'),
 ]
