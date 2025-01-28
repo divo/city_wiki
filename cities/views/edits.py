@@ -19,10 +19,19 @@ def edit_content_view(request):
     city_data = []
     for city in cities:
         poi_lists = PoiList.objects.filter(city=city).order_by('title')
+        poi_list_data = []
+        for poi_list in poi_lists:
+            pois = poi_list.pois.all().values('id', 'name', 'description')
+            poi_list_data.append({
+                'id': poi_list.id,
+                'title': poi_list.title,
+                'pois': list(pois)
+            })
+        
         city_data.append({
             'id': city.id,
             'name': city.name,
-            'poi_lists': list(poi_lists.values('id', 'title'))
+            'poi_lists': poi_list_data
         })
     
     return render(request, 'cities/edit_content.html', {
@@ -30,63 +39,70 @@ def edit_content_view(request):
         'city_data_json': json.dumps(city_data, cls=DjangoJSONEncoder)  # For JavaScript
     })
 
-def generate_reword_local(request):
-    """[DEPRECATED] Send text to local completion endpoint for rewording."""
-    with open('debug.log', 'a', encoding='utf-8') as f:
-        try:
-            text = request.POST.get('text', '')
-            if not text:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'No text provided'
-                }, status=400)
-
-            messages = [
-                {
-                    "role": "system",
-                    "content": "Act as an editor for a travel guide. Your task is to rewrite the input text describing a tourist attraction, making it more consistent and relevant to a reader of a travel guide. It should be rewritten in a more consistent tone, with a more professional style. Remove any extraneous or overly specific information not relevant to someone just looking to get an overview of the attraction.The tone should remain professional, but friendly and approachable."
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
-            ]
-
-            f.write(f"Sending chat request with messages: {messages}\n")
-            response = requests.post('http://localhost:8080/v1/chat/completions', 
-                json={
-                    "messages": messages,
-                    "temperature": 0.7,
-                    "max_tokens": 4000,
-                    "presence_penalty": 0.1,
-                    "frequency_penalty": 0.1,
-                    "stream": False
-                },
-                timeout=120
-            )
-
-            response.raise_for_status()
-            data = response.json()
-            
-            # Clean up the response - chat completions return message content
-            content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-            
-            f.write(f"Received reworded response: {content}\n")
-            return JsonResponse({
-                'content': content
-            })
-        except requests.RequestException as e:
-            f.write(f"Request error: {str(e)}\n")
-            return JsonResponse({
-                'status': 'error',
-                'message': f'Completion service error: {str(e)}'
-            }, status=500)
-        except Exception as e:
-            f.write(f"Unexpected error: {str(e)}\n")
-            return JsonResponse({
-                'status': 'error',
-                'message': str(e)
-            }, status=500)
+#def generate_reword_local(request):
+#    """[DEPRECATED] Send text to local completion endpoint for rewording."""
+#    with open('debug.log', 'a', encoding='utf-8') as f:
+#        try:
+#            text = request.POST.get('text', '')
+#            if not text:
+#                return JsonResponse({
+#                    'status': 'error',
+#                    'message': 'No text provided'
+#                }, status=400)
+#
+#            messages = [
+#                {
+#                    "role": "system",
+#                    "content": (
+#                        "Act as an editor for a travel guide. Your task is to rewrite the input text "
+#                        "describing a tourist attraction, making it more consistent and relevant to a reader "
+#                        "of a travel guide. It should be rewritten in a more consistent tone, with a more "
+#                        "professional style. Remove any extraneous or overly specific information not relevant "
+#                        "to someone just looking to get an overview of the attraction. The tone should remain "
+#                        "professional, but friendly and approachable. Make sure to use multiple paragraphs to break up the text."
+#                    )
+#                },
+#                {
+#                    "role": "user",
+#                    "content": text
+#                }
+#            ]
+#
+#            f.write(f"Sending chat request with messages: {messages}\n")
+#            response = requests.post('http://localhost:8080/v1/chat/completions', 
+#                json={
+#                    "messages": messages,
+#                    "temperature": 0.7,
+#                    "max_tokens": 4000,
+#                    "presence_penalty": 0.1,
+#                    "frequency_penalty": 0.1,
+#                    "stream": False
+#                },
+#                timeout=120
+#            )
+#
+#            response.raise_for_status()
+#            data = response.json()
+#            
+#            # Clean up the response - chat completions return message content
+#            content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+#            
+#            f.write(f"Received reworded response: {content}\n")
+#            return JsonResponse({
+#                'content': content
+#            })
+#        except requests.RequestException as e:
+#            f.write(f"Request error: {str(e)}\n")
+#            return JsonResponse({
+#                'status': 'error',
+#                'message': f'Completion service error: {str(e)}'
+#            }, status=500)
+#        except Exception as e:
+#            f.write(f"Unexpected error: {str(e)}\n")
+#            return JsonResponse({
+#                'status': 'error',
+#                'message': str(e)
+#            }, status=500)
 
 
 def generate_reword(request):
@@ -105,7 +121,15 @@ def generate_reword(request):
             messages=[
                 {
                     "role": "system",
-                    "content": "Act as an editor for a travel guide. Your task is to rewrite the input text describing a tourist attraction, making it more consistent and relevant to a reader of a travel guide. It should be rewritten in a more consistent tone, with a more professional style. Remove any extraneous or overly specific information not relevant to someone just looking to get an overview of the attraction.The tone should remain professional, but friendly and approachable."
+                    "content": (
+                        "Act as an editor for a travel guide. Your task is to rewrite the input text "
+                        "describing a tourist attraction, making it more consistent and relevant to a reader "
+                        "of a travel guide. It should be rewritten in a more consistent tone, with a more "
+                        "professional style. Remove any extraneous or overly specific information not relevant "
+                        "to someone just looking to get an overview of the attraction. The tone should remain "
+                        "professional, but friendly and approachable. Make sure to use multiple paragraphs to break up the text."
+                        "Do not include any markdown or html in the response. Do not include the attractions name as a title, but you can use it in the description."
+                    )
                 },
                 {
                     "role": "user",
@@ -119,10 +143,10 @@ def generate_reword(request):
             stop=None
         )
         
-        content = completion.choices[0].message.content.strip()
+        content = completion.choices[0].message.content
         
         # Strip out thinking process
-        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
         
         return JsonResponse({
             'content': content

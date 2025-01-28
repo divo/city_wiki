@@ -3,7 +3,7 @@
 {% block content %}
 <style>
     .container {
-        max-width: 800px;
+        max-width: 1200px;  /* Increased to accommodate the wider table */
         margin: 2rem auto;
     }
     
@@ -56,6 +56,61 @@
         height: 1rem;
         margin-left: 0.5rem;
     }
+
+    .poi-table {
+        width: 100%;
+        margin-top: 2rem;
+        border-collapse: collapse;
+    }
+
+    .poi-table th,
+    .poi-table td {
+        padding: 0.75rem;
+        border: 1px solid #dee2e6;
+        text-align: left;
+    }
+
+    .poi-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+
+    .poi-table td {
+        vertical-align: top;
+    }
+
+    .poi-table tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .poi-list-container {
+        margin-top: 2rem;
+        display: none;
+    }
+
+    .reword-btn {
+        padding: 0.375rem 0.75rem;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 0.25rem;
+        cursor: pointer;
+    }
+
+    .reword-btn:hover {
+        background-color: #0056b3;
+    }
+
+    .reword-btn:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+    }
+
+    .poi-table td.description {
+        min-width: 250px;  /* Ensure description columns have enough width */
+        max-width: 400px;  /* Prevent descriptions from getting too wide */
+        white-space: pre-wrap;  /* Preserve whitespace and wrap text */
+    }
 </style>
 
 <div class="container">
@@ -77,6 +132,22 @@
         <select id="poiListSelect" class="form-control" disabled>
             <option value="">Select a POI list...</option>
         </select>
+    </div>
+
+    <div id="poiListContainer" class="poi-list-container">
+        <h3>Points of Interest</h3>
+        <table class="poi-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Original Description</th>
+                    <th>Reworded Description</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="poiTableBody">
+            </tbody>
+        </table>
     </div>
     
     <form id="rewordForm" class="mb-4">
@@ -127,11 +198,13 @@ function getCookie(name) {
 document.getElementById('citySelect').addEventListener('change', function(e) {
     const cityId = e.target.value;
     const poiListSelect = document.getElementById('poiListSelect');
+    const poiListContainer = document.getElementById('poiListContainer');
     
     // Reset and disable POI list select if no city selected
     if (!cityId) {
         poiListSelect.innerHTML = '<option value="">Select a POI list...</option>';
         poiListSelect.disabled = true;
+        poiListContainer.style.display = 'none';
         return;
     }
     
@@ -149,6 +222,48 @@ document.getElementById('citySelect').addEventListener('change', function(e) {
     });
     
     poiListSelect.disabled = false;
+    poiListContainer.style.display = 'none';
+});
+
+// Update POI table when list is selected
+document.getElementById('poiListSelect').addEventListener('change', function(e) {
+    const cityId = document.getElementById('citySelect').value;
+    const listId = e.target.value;
+    const poiListContainer = document.getElementById('poiListContainer');
+    const poiTableBody = document.getElementById('poiTableBody');
+    
+    if (!listId) {
+        poiListContainer.style.display = 'none';
+        return;
+    }
+    
+    const city = cityData.find(c => c.id === parseInt(cityId));
+    const list = city.poi_lists.find(l => l.id === parseInt(listId));
+    
+    if (!list) return;
+    
+    // Update POI table
+    poiTableBody.innerHTML = '';
+    list.pois.forEach(poi => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${poi.name}</td>
+            <td class="description">${poi.description || ''}</td>
+            <td class="description reworded"></td>
+            <td>
+                <button 
+                    class="reword-btn" 
+                    onclick="rewordDescription(${poi.id}, '${poi.name}', this)"
+                    ${!poi.description ? 'disabled' : ''}
+                >
+                    Reword Description
+                </button>
+            </td>
+        `;
+        poiTableBody.appendChild(row);
+    });
+    
+    poiListContainer.style.display = 'block';
 });
 
 document.getElementById('rewordForm').addEventListener('submit', async function(e) {
@@ -194,5 +309,44 @@ document.getElementById('rewordForm').addEventListener('submit', async function(
         loading.classList.add('d-none');
     }
 });
+
+// Add reword function
+async function rewordDescription(poiId, poiName, button) {
+    const row = button.closest('tr');
+    const description = row.querySelector('td:nth-child(2)').textContent;
+    const rewordedCell = row.querySelector('td.reworded');
+    const originalButton = button.textContent;
+    
+    // Disable button and show loading state
+    button.disabled = true;
+    button.textContent = 'Rewording...';
+    rewordedCell.textContent = 'Generating...';
+    
+    try {
+        const response = await fetch('/generate/reword/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: `text=${encodeURIComponent(description)}`
+        });
+        
+        const data = await response.json();
+        
+        if (data.content) {
+            // Update the reworded description cell with the new content
+            rewordedCell.textContent = data.content;
+        } else if (data.message) {
+            rewordedCell.textContent = 'Error: ' + data.message;
+        }
+    } catch (error) {
+        rewordedCell.textContent = 'Error: ' + error.message;
+    } finally {
+        // Reset button state
+        button.disabled = false;
+        button.textContent = originalButton;
+    }
+}
 </script>
 {% endblock %} 
