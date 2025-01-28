@@ -1,11 +1,13 @@
 from django.urls import path
 from . import views
+from .views import edits
 
 urlpatterns = [
     path('', views.city_list, name='city_list'),
     path('cities.json', views.city_list_json, name='city_list_json'),
     path('generate/', views.generate_text_view, name='generate_text_view'),
-    path('generate/reword/', views.generate_reword, name='generate_reword'),
+    path('generate/reword/', edits.generate_reword, name='generate_reword'),
+    path('edit_content/', edits.edit_content_view, name='edit_content_view'),
     path('city/<str:city_name>/', views.city_detail, name='city_detail'),
     path('city/<str:city_name>/map/', views.city_map, name='city_map'),
     path('city/<str:city_name>/delete/', views.delete_city, name='delete_city'),

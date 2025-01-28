@@ -40,14 +40,7 @@ from .images import (
     delete_city_image,
 )
 
-from .generation import (
-    generate_text_view,
-    generate_text,
-    generate_list,
-    generate_reword
-)
-
-from .views import (
-    execute_task,
-    check_task_status,
-)
+from .views import *
+from .pois import *
+from .generation import generate_text_view, generate_text, generate_list
+from .edits import edit_content_view, generate_reword
