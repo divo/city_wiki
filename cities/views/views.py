@@ -28,20 +28,6 @@ def generate_text_view(request):
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def generate_text(request, city_name):
-    """Generate structured JSON analysis using OpenAI's API based on city data."""
-    return generation.generate_text(request, city_name)
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def generate_list(request, city_name):
-    """Generate structured JSON lists of POIs using OpenAI's API."""
-    return generation.generate_list(request, city_name)
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
 def execute_task(request, city_name, task_id):
     """Execute an enrichment task."""
     try:
@@ -106,5 +92,28 @@ def check_task_status(request, task_id):
             'status': 'error',
             'message': str(e)
         }, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_text(request, city_name):
+    """Generate structured JSON analysis using OpenAI's API based on city data."""
+    return generation.generate_text(request, city_name)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_list(request, city_name):
+    """Generate structured JSON lists of POIs using OpenAI's API."""
+    return generation.generate_list(request, city_name)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def generate_reword(request):
+    """Send text to local completion endpoint for rewording."""
+    return generation.generate_reword(request)
+
+
 
 

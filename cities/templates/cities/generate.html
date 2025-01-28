@@ -402,156 +402,203 @@
     }
 </style>
 
-<div class="generate-container">
-    <h1>Generate Content</h1>
+<div class="container mt-4">
+    <h2>Generate Content for {{ city.name }}</h2>
     
-    <div class="type-select">
-        <div class="form-group">
-            <label for="generationType">Generation Type:</label>
-            <select id="generationType" name="type">
-                <option value="analysis">City Analysis</option>
-                <option value="list">POI Lists</option>
-            </select>
-        </div>
-        <div class="type-description" id="typeDescription">
-            Generate a detailed analysis of the city's points of interest, including category distribution and district insights.
-        </div>
-    </div>
-    
-    <div id="predefinedQueriesSection" class="predefined-queries" style="display: none;">
-        <div class="form-group">
-            <label for="predefinedQuery">Quick Lists:</label>
-            <select id="predefinedQuery">
-                <option value="">-- Select a predefined query --</option>
-                <option value="highlights">Highlights</option>
-                <option value="must see attractions">Must See Attractions</option>
-                <option value="museums">Museums</option>
-                <option value="top experiences">Top Experiences</option>
-                <option value="free things">Free Things</option>
-                <option value="scenic views">Scenic Views</option>
-                <option value="local hangouts">Local Hangouts</option>
-                <option value="movie locations">Movie Locations</option>
-                <option value="architecture">Architecture</option>
-                <option value="parks">Parks</option>
-                <option value="walks">Walks</option>
-                <option value="markets">Markets</option>
-                <option value="churches">Churches and cathedrals</option>
-                <option value="literature attractions">Literature Attractions</option>
-                <option value="art attractions">Art Attractions</option>
-                <option value="historic sights">Historic Sights</option>
-            </select>
-        </div>
-    </div>
-    
-    <form id="generateForm">
-        <div class="form-group">
-            <label for="citySelect">Select City:</label>
-            <select id="citySelect" name="city" required>
-                <option value="">Choose a city...</option>
-                {% for city in cities %}
-                    <option value="{{ city.name }}">{{ city.name }} ({{ city.poi_count }} POIs)</option>
-                {% endfor %}
-            </select>
+    <ul class="nav nav-tabs" id="generationTabs" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="analysis-tab" data-toggle="tab" href="#analysis" role="tab">Analysis</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="lists-tab" data-toggle="tab" href="#lists" role="tab">Lists</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="reword-tab" data-toggle="tab" href="#rewordDescription" role="tab">Reword Description</a>
+        </li>
+    </ul>
+
+    <div class="generate-container">
+        <h1>Generate Content</h1>
+        
+        <div class="type-select">
+            <div class="form-group">
+                <label for="generationType">Generation Type:</label>
+                <select id="generationType" name="type">
+                    <option value="analysis">City Analysis</option>
+                    <option value="list">POI Lists</option>
+                </select>
+            </div>
+            <div class="type-description" id="typeDescription">
+                Generate a detailed analysis of the city's points of interest, including category distribution and district insights.
+            </div>
         </div>
         
-        <div class="form-group" id="countGroup" style="display: none;">
-            <label for="count">Number of POIs:</label>
-            <input type="number" id="count" name="count" min="1" value="5" class="form-control">
-            <small class="form-text text-muted">How many points of interest should be included in the list?</small>
+        <div id="predefinedQueriesSection" class="predefined-queries" style="display: none;">
+            <div class="form-group">
+                <label for="predefinedQuery">Quick Lists:</label>
+                <select id="predefinedQuery">
+                    <option value="">-- Select a predefined query --</option>
+                    <option value="highlights">Highlights</option>
+                    <option value="must see attractions">Must See Attractions</option>
+                    <option value="museums">Museums</option>
+                    <option value="top experiences">Top Experiences</option>
+                    <option value="free things">Free Things</option>
+                    <option value="scenic views">Scenic Views</option>
+                    <option value="local hangouts">Local Hangouts</option>
+                    <option value="movie locations">Movie Locations</option>
+                    <option value="architecture">Architecture</option>
+                    <option value="parks">Parks</option>
+                    <option value="walks">Walks</option>
+                    <option value="markets">Markets</option>
+                    <option value="churches">Churches and cathedrals</option>
+                    <option value="literature attractions">Literature Attractions</option>
+                    <option value="art attractions">Art Attractions</option>
+                    <option value="historic sights">Historic Sights</option>
+                </select>
+            </div>
         </div>
         
-        <div class="form-group">
-            <label for="prompt">Prompt:</label>
-            <textarea id="prompt" name="prompt" required
-                      placeholder="Enter your prompt here..."></textarea>
-        </div>
+        <form id="generateForm">
+            <div class="form-group">
+                <label for="citySelect">Select City:</label>
+                <select id="citySelect" name="city" required>
+                    <option value="">Choose a city...</option>
+                    {% for city in cities %}
+                        <option value="{{ city.name }}">{{ city.name }} ({{ city.poi_count }} POIs)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group" id="countGroup" style="display: none;">
+                <label for="count">Number of POIs:</label>
+                <input type="number" id="count" name="count" min="1" value="5" class="form-control">
+                <small class="form-text text-muted">How many points of interest should be included in the list?</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="prompt">Prompt:</label>
+                <textarea id="prompt" name="prompt" required
+                          placeholder="Enter your prompt here..."></textarea>
+            </div>
+            
+            <button type="submit" class="generate-btn" id="generateBtn">Generate</button>
+        </form>
         
-        <button type="submit" class="generate-btn" id="generateBtn">Generate</button>
-    </form>
-    
-    <div class="loading" id="loading">Generating response</div>
-    <div class="error-message" id="errorMessage"></div>
-    
-    <div class="response-container" id="responseContainer">
-        <!-- Analysis View -->
-        <div id="analysisView" style="display: none;">
-            <div class="analysis-section">
-                <h2>Summary</h2>
-                <p id="summary"></p>
-            </div>
-
-            <div class="analysis-section">
-                <h2>Key Findings</h2>
-                <ul class="key-findings" id="keyFindings"></ul>
-            </div>
-
-            <div class="analysis-section">
-                <h2>Category Distribution</h2>
-                <p id="categoryDescription"></p>
-                <ul class="highlights" id="categoryHighlights"></ul>
-            </div>
-
-            <div class="analysis-section">
-                <h2>District Insights</h2>
-                <p id="districtDescription"></p>
-                <ul class="highlights" id="districtHighlights"></ul>
-            </div>
-
-            <div class="analysis-section">
-                <h2>Recommendations</h2>
-                <div class="recommendations" id="recommendations"></div>
-            </div>
-        </div>
-
-        <!-- List View -->
-        <div id="listView" style="display: none;">
-            <div class="list-section">
-                <h2 id="generatedListTitle"></h2>
-                <p id="listDescription"></p>
-                
-                <div class="list-creation">
-                    <input type="text" id="saveListTitle" placeholder="Enter list title" class="form-control">
-                    <button onclick="createList()" class="btn btn-success">Save as List</button>
+        <div class="loading" id="loading">Generating response</div>
+        <div class="error-message" id="errorMessage"></div>
+        
+        <div class="response-container" id="responseContainer">
+            <!-- Analysis View -->
+            <div id="analysisView" style="display: none;">
+                <div class="analysis-section">
+                    <h2>Summary</h2>
+                    <p id="summary"></p>
                 </div>
-                
-                <div class="table-responsive">
-                    <table class="poi-table">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Category</th>
-                                <th>District</th>
-                                <th>Description</th>
-                                <th>Address</th>
-                                <th>Contact</th>
-                                <th>Hours</th>
-                                <th>Website</th>
-                            </tr>
-                        </thead>
-                        <tbody id="poiList">
-                        </tbody>
-                    </table>
+
+                <div class="analysis-section">
+                    <h2>Key Findings</h2>
+                    <ul class="key-findings" id="keyFindings"></ul>
+                </div>
+
+                <div class="analysis-section">
+                    <h2>Category Distribution</h2>
+                    <p id="categoryDescription"></p>
+                    <ul class="highlights" id="categoryHighlights"></ul>
+                </div>
+
+                <div class="analysis-section">
+                    <h2>District Insights</h2>
+                    <p id="districtDescription"></p>
+                    <ul class="highlights" id="districtHighlights"></ul>
+                </div>
+
+                <div class="analysis-section">
+                    <h2>Recommendations</h2>
+                    <div class="recommendations" id="recommendations"></div>
                 </div>
             </div>
+
+            <!-- List View -->
+            <div id="listView" style="display: none;">
+                <div class="list-section">
+                    <h2 id="generatedListTitle"></h2>
+                    <p id="listDescription"></p>
+                    
+                    <div class="list-creation">
+                        <input type="text" id="saveListTitle" placeholder="Enter list title" class="form-control">
+                        <button onclick="createList()" class="btn btn-success">Save as List</button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="poi-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>District</th>
+                                    <th>Description</th>
+                                    <th>Address</th>
+                                    <th>Contact</th>
+                                    <th>Hours</th>
+                                    <th>Website</th>
+                                </tr>
+                            </thead>
+                            <tbody id="poiList">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Common Validation Section -->
+            <div class="analysis-section">
+                <h2>Validation</h2>
+                <p>POIs referenced: <span id="mentionedPoisCount"></span> out of <span id="totalPoisCount"></span></p>
+                <div class="validation-details">
+                    <h3>Referenced POIs:</h3>
+                    <ul class="mentioned-pois" id="mentionedPois"></ul>
+                    <div id="missingPoisSection" style="display: none;">
+                        <h3>Missing POIs:</h3>
+                        <p class="text-muted">These POIs were mentioned but not found in the database:</p>
+                        <ul class="missing-pois" id="missingPois"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <button class="toggle-raw-json" onclick="toggleRawJson()">Toggle Raw JSON</button>
+            <pre class="raw-json" id="rawJson"></pre>
         </div>
 
-        <!-- Common Validation Section -->
-        <div class="analysis-section">
-            <h2>Validation</h2>
-            <p>POIs referenced: <span id="mentionedPoisCount"></span> out of <span id="totalPoisCount"></span></p>
-            <div class="validation-details">
-                <h3>Referenced POIs:</h3>
-                <ul class="mentioned-pois" id="mentionedPois"></ul>
-                <div id="missingPoisSection" style="display: none;">
-                    <h3>Missing POIs:</h3>
-                    <p class="text-muted">These POIs were mentioned but not found in the database:</p>
-                    <ul class="missing-pois" id="missingPois"></ul>
+        <div class="tab-content" id="generationTabsContent">
+            <!-- Existing tabs -->
+            
+            <!-- Reword Description Tab -->
+            <div class="tab-pane fade" id="rewordDescription" role="tabpanel">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Reword Description</h5>
+                        <form id="rewordForm" class="mb-4">
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label for="textToReword">Text to Reword:</label>
+                                <textarea class="form-control" id="textToReword" rows="4" required></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary mt-3" id="rewordBtn">
+                                Reword Text
+                                <div class="spinner-border spinner-border-sm d-none" role="status" id="rewordLoading">
+                                    <span class="sr-only">Loading...</span>
+                                </div>
+                            </button>
+                        </form>
+                        
+                        <div id="rewordResult" class="mt-4" style="display: none;">
+                            <h6>Response:</h6>
+                            <pre id="rewordedText" class="p-3 bg-light"></pre>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
-
-        <button class="toggle-raw-json" onclick="toggleRawJson()">Toggle Raw JSON</button>
-        <pre class="raw-json" id="rawJson"></pre>
     </div>
 </div>
 
@@ -811,5 +858,38 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// Add reword functionality
+document.getElementById('rewordForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const text = document.getElementById('textToReword').value;
+    const button = document.getElementById('rewordBtn');
+    const loading = document.getElementById('rewordLoading');
+    const result = document.getElementById('rewordResult');
+    const rewordedText = document.getElementById('rewordedText');
+    
+    // Reset UI
+    button.disabled = true;
+    loading.classList.remove('d-none');
+    
+    try {
+        const response = await fetch('/generate/reword/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: `text=${encodeURIComponent(text)}`
+        });
+        
+        const data = await response.json();
+        rewordedText.textContent = JSON.stringify(data, null, 2);
+        result.style.display = 'block';
+    } finally {
+        button.disabled = false;
+        loading.classList.add('d-none');
+    }
+});
 </script>
 {% endblock %} 

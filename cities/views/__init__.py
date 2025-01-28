@@ -44,6 +44,7 @@ from .generation import (
     generate_text_view,
     generate_text,
     generate_list,
+    generate_reword
 )
 
 from .views import (
