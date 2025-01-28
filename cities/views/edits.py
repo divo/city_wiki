@@ -109,6 +109,7 @@ def generate_reword(request):
     """Send text to Groq's API for rewording."""
     try:
         text = request.POST.get('text', '')
+        name = request.POST.get('name', '')
         if not text:
             return JsonResponse({
                 'status': 'error',
@@ -127,13 +128,13 @@ def generate_reword(request):
                         "of a travel guide. It should be rewritten in a more consistent tone, with a more "
                         "professional style. Remove any extraneous or overly specific information not relevant "
                         "to someone just looking to get an overview of the attraction. The tone should remain "
-                        "professional, but friendly and approachable. Make sure to use multiple paragraphs to break up the text."
+                        "professional, but friendly and approachable. Make sure to use multiple paragraphs to break up the text. "
                         "Do not include any markdown or html in the response. Do not include the attractions name as a title, but you can use it in the description."
                     )
                 },
                 {
                     "role": "user",
-                    "content": text
+                    "content": f"Please rewrite this description of {name}:\n\n{text}"
                 }
             ],
             temperature=0.6,

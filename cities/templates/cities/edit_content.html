@@ -329,7 +329,7 @@ async function rewordDescription(poiId, poiName, button) {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-CSRFToken': getCookie('csrftoken')
             },
-            body: `text=${encodeURIComponent(description)}`
+            body: `text=${encodeURIComponent(description)}&name=${encodeURIComponent(poiName)}`
         });
         
         const data = await response.json();
