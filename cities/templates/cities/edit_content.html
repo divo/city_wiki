@@ -11,6 +11,18 @@
         margin-bottom: 2rem;
     }
     
+    .select-container {
+        margin-bottom: 1rem;
+    }
+    
+    .select-container select {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        margin-top: 0.25rem;
+    }
+    
     .input-container textarea {
         width: 100%;
         padding: 0.5rem;
@@ -48,7 +60,24 @@
 
 <div class="container">
     <h2>Edit Content</h2>
-    <p class="text-muted">Enter your text below to get a reworded version.</p>
+    <p class="text-muted">Select a city and POI list, then enter text to reword.</p>
+    
+    <div class="select-container">
+        <label for="citySelect">City:</label>
+        <select id="citySelect" class="form-control">
+            <option value="">Select a city...</option>
+            {% for city in cities %}
+            <option value="{{ city.id }}">{{ city.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="select-container">
+        <label for="poiListSelect">POI List:</label>
+        <select id="poiListSelect" class="form-control" disabled>
+            <option value="">Select a POI list...</option>
+        </select>
+    </div>
     
     <form id="rewordForm" class="mb-4">
         {% csrf_token %}
@@ -76,6 +105,9 @@
 </div>
 
 <script>
+// Store POI lists data
+const cityData = JSON.parse("{{ city_data_json|escapejs }}");
+
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -90,6 +122,34 @@ function getCookie(name) {
     }
     return cookieValue;
 }
+
+// Update POI lists when city is selected
+document.getElementById('citySelect').addEventListener('change', function(e) {
+    const cityId = e.target.value;
+    const poiListSelect = document.getElementById('poiListSelect');
+    
+    // Reset and disable POI list select if no city selected
+    if (!cityId) {
+        poiListSelect.innerHTML = '<option value="">Select a POI list...</option>';
+        poiListSelect.disabled = true;
+        return;
+    }
+    
+    // Find selected city's POI lists
+    const city = cityData.find(c => c.id === parseInt(cityId));
+    if (!city) return;
+    
+    // Update POI list options
+    poiListSelect.innerHTML = '<option value="">Select a POI list...</option>';
+    city.poi_lists.forEach(list => {
+        const option = document.createElement('option');
+        option.value = list.id;
+        option.textContent = list.title;
+        poiListSelect.appendChild(option);
+    });
+    
+    poiListSelect.disabled = false;
+});
 
 document.getElementById('rewordForm').addEventListener('submit', async function(e) {
     e.preventDefault();
