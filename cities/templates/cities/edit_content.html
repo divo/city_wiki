@@ -288,7 +288,8 @@ document.getElementById('poiListSelect').addEventListener('change', function(e) 
             <td>
                 <button 
                     class="reword-btn" 
-                    onclick="rewordDescription(${poi.id}, '${poi.name}', this)"
+                    data-poi-name="${poi.name}"
+                    onclick="rewordDescription(${poi.id}, this.dataset.poiName, this)"
                 >
                     ${hasDescription ? 'Reword Description' : 'Create Description'}
                 </button>
