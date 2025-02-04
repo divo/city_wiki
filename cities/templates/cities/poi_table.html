@@ -368,6 +368,14 @@
             flex-direction: column;
         }
 
+        .has-revisions {
+            background-color: #e8f5e9;  /* Light green */
+        }
+
+        .no-revisions {
+            background-color: #ffebee;  /* Light red */
+        }
+
         .reworded {
             margin-top: 0.5rem;
             padding: 0.5rem;
@@ -483,7 +491,7 @@
                             {% endif %}
                         </td>
                         <td {% if not poi.description %}class="empty-cell"{% endif %}>
-                            <div class="description-cell">
+                            <div class="description-cell {% if poi.has_revisions %}has-revisions{% else %}no-revisions{% endif %}">
                                 <div>{{ poi.description|default:"" }}</div>
                                 <textarea class="reworded"></textarea>
                                 <div class="button-group">

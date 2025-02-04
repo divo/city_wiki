@@ -131,6 +131,10 @@ class PointOfInterest(models.Model):
             self.image_file = None
             self.save()
 
+    def has_revisions(self):
+        """Check if the POI has any revisions."""
+        return Version.objects.filter(object_id=self.id).exists()
+
     # Use by the admin site
     @property
     def image_url(self):
