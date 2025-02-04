@@ -1169,6 +1169,18 @@
             const saveButton = cell.querySelector('.save-btn');
             const originalButton = button.textContent;
             
+            // Get coordinates from the row
+            const row = button.closest('tr');
+            const coordsCell = row.querySelector('td:nth-child(7)');
+            let lat = null;
+            let lon = null;
+            if (coordsCell) {
+                const coords = coordsCell.textContent.trim().split(',');
+                if (coords.length === 2) {
+                    [lat, lon] = coords.map(c => c.trim());
+                }
+            }
+            
             // Set up auto-resize for the textarea
             rewordedText.addEventListener('input', () => autoResizeTextarea(rewordedText));
             
@@ -1186,7 +1198,7 @@
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     },
-                    body: `query=${poiName}`
+                    body: `query=${poiName}${lat ? `&lat=${lat}` : ''}${lon ? `&lon=${lon}` : ''}`
                 });
                 
                 const data = await response.json();
@@ -1218,6 +1230,18 @@
             const saveButton = cell.querySelector('.save-btn');
             const originalButton = button.textContent;
             
+            // Get coordinates from the row
+            const row = button.closest('tr');
+            const coordsCell = row.querySelector('td:nth-child(7)');
+            let lat = null;
+            let lon = null;
+            if (coordsCell) {
+                const coords = coordsCell.textContent.trim().split(',');
+                if (coords.length === 2) {
+                    [lat, lon] = coords.map(c => c.trim());
+                }
+            }
+            
             // Set up auto-resize for the textarea
             rewordedText.addEventListener('input', () => autoResizeTextarea(rewordedText));
             
@@ -1236,7 +1260,7 @@
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     },
-                    body: `query=${poiName}`
+                    body: `query=${poiName}${lat ? `&lat=${lat}` : ''}${lon ? `&lon=${lon}` : ''}`
                 });
                 
                 const wikiData = await wikiResponse.json();

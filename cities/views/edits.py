@@ -223,13 +223,24 @@ def generate_wikipedia(request):
     """Search Wikipedia for a POI and return its summary."""
     try:
         query = request.POST.get('query', '')
+        lat = request.POST.get('lat')
+        lon = request.POST.get('lon')
+        
         if not query:
             return JsonResponse({
                 'status': 'error',
                 'message': 'No search query provided'
             }, status=400)
         
-        result = search_wikipedia(query)
+        # Convert coordinates to float if provided
+        try:
+            lat = float(lat) if lat else None
+            lon = float(lon) if lon else None
+        except ValueError:
+            lat = None
+            lon = None
+        
+        result = search_wikipedia(query, lat=lat, lon=lon)
         
         if result['summary']:
             return JsonResponse({
@@ -246,4 +257,4 @@ def generate_wikipedia(request):
         return JsonResponse({
             'status': 'error',
             'message': str(e)
-        }, status=500) 
+        }, status=500)
