@@ -679,7 +679,10 @@ document.getElementById('generateForm').addEventListener('submit', async functio
             formData.append('count', count);
         }
         
-        const response = await fetch(`/city/${encodeURIComponent(citySelect.value)}/${endpoint}/`, {
+        // Properly encode the city name for the URL
+        const encodedCityName = encodeURIComponent(citySelect.value).replace(/%20/g, '+');
+        
+        const response = await fetch(`/city/${encodedCityName}/${endpoint}/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
