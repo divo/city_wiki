@@ -1109,7 +1109,9 @@
                 const data = await response.json();
                 
                 if (data.content) {
-                    rewordedText.value = data.content;
+                    // Trim leading and trailing newlines but preserve internal ones
+                    const trimmedContent = data.content.replace(/^\n+|\n+$/g, '');
+                    rewordedText.value = trimmedContent;
                     autoResizeTextarea(rewordedText);
                     saveButton.style.display = 'block';
                 } else if (data.message) {
@@ -1262,7 +1264,9 @@
                 const generateData = await generateResponse.json();
                 
                 if (generateData.content) {
-                    rewordedText.value = generateData.content;
+                    // Trim leading and trailing newlines but preserve internal ones
+                    const trimmedContent = generateData.content.replace(/^\n+|\n+$/g, '');
+                    rewordedText.value = trimmedContent;
                     autoResizeTextarea(rewordedText);
                     saveButton.style.display = 'block';
                 } else if (generateData.message) {
