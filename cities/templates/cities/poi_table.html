@@ -1048,7 +1048,7 @@
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     },
-                    body: `text=${encodeURIComponent(description)}&name=${encodeURIComponent(poiName)}`
+                    body: `text=${encodeURIComponent(description)}&name=${encodeURIComponent(poiName)}&breif=true`
                 });
                 
                 const data = await response.json();

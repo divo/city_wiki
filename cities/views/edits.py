@@ -111,6 +111,7 @@ def generate_reword(request):
     try:
         text = request.POST.get('text', '')
         name = request.POST.get('name', '')
+        breif = request.POST.get('breif', False)
         
         if not name:
             return JsonResponse({
@@ -148,12 +149,12 @@ def generate_reword(request):
                     "role": "system",
                     "content": (
                         "Act as a travel writer for a guide book. Your task is to write a new description "
-                        "for a tourist attraction. The description should be informative, engaging, and relevant "
-                        "to readers of a travel guide. Write in a professional yet approachable style. "
-                        "Since we don't have specific details, focus on creating a general, inviting description "
-                        "that encourages visitors to explore the attraction. Use multiple paragraphs to break up the text. "
+                        "for a tourist attraction. The description should be informative, and relevant "
+                        "to readers of a travel guide. The style should be like a wikipedia article. "
+                        "Since we don't have specific details, focus on creating a general overview description "
+                        "Use multiple paragraphs to break up the text. "
                         "Do not include any markdown or html in the response. Do not include the attraction's name as a title, "
-                        "but you can use it in the description. Keep the description general but enticing, since we don't have "
+                        "but you can use it in the description. Keep the description general, since we don't have "
                         "specific details about opening hours, prices, or exact features."
                     )
                 },
@@ -162,6 +163,9 @@ def generate_reword(request):
                     "content": f"Please write a new description for a tourist attraction named {name}."
                 }
             ]
+
+        if breif:
+            messages[0]['content'] = messages[0]['content'] + " Keep the description to 100 words or less."
 
         completion = client.chat.completions.create(
             model="deepseek-r1-distill-llama-70b",
