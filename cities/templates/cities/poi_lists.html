@@ -288,7 +288,8 @@ document.querySelectorAll('.fetch-image-btn').forEach(button => {
         this.textContent = 'Fetching...';
         
         try {
-            const response = await fetch(`/city/{{ city.name }}/poi/${poiId}/fetch_image/`, {
+            const cityName = encodeURIComponent('{{ city.name }}');
+            const response = await fetch(`/city/${cityName}/poi/${poiId}/fetch_image/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -340,7 +341,8 @@ document.querySelectorAll('.fetch-image-btn').forEach(button => {
 
 async function selectImage(imageUrl, poiId, imagesGrid, fetchButton) {
     try {
-        const response = await fetch(`/city/{{ city.name }}/poi/${poiId}/save_image/`, {
+        const cityName = encodeURIComponent('{{ city.name }}');
+        const response = await fetch(`/city/${cityName}/poi/${poiId}/save_image/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -392,8 +394,12 @@ async function selectImage(imageUrl, poiId, imagesGrid, fetchButton) {
 async function deleteImage(poiId, container) {
     if (confirm('Are you sure you want to delete this image?')) {
         try {
-            const response = await fetch(`/city/{{ city.name }}/poi/${poiId}/delete_image/`, {
-                method: 'POST'
+            const cityName = encodeURIComponent('{{ city.name }}');
+            const response = await fetch(`/city/${cityName}/poi/${poiId}/delete_image/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
             });
             
             const data = await response.json();
@@ -447,7 +453,8 @@ async function fetchImages(poiId, searchContainer) {
     button.textContent = 'Searching...';
     
     try {
-        const response = await fetch('/city/{{ city.name }}/poi/' + poiId + '/fetch_image/', {
+        const cityName = encodeURIComponent('{{ city.name }}');
+        const response = await fetch(`/city/${cityName}/poi/${poiId}/fetch_image/`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
