@@ -10,6 +10,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from django.views.decorators.http import require_http_methods
 from groq import Groq
 from ..models import City, PoiList, PointOfInterest
+from data_processing.wikipedia_scraper import search_wikipedia
 
 def edit_content_view(request):
     """Render the edit content interface."""
@@ -211,6 +212,36 @@ def update_poi_description(request, poi_id):
             'status': 'success',
             'message': 'Description updated successfully'
         })
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500) 
+
+@require_http_methods(["POST"])
+def generate_wikipedia(request):
+    """Search Wikipedia for a POI and return its summary."""
+    try:
+        query = request.POST.get('query', '')
+        if not query:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No search query provided'
+            }, status=400)
+        
+        result = search_wikipedia(query)
+        
+        if result['summary']:
+            return JsonResponse({
+                'summary': result['summary'],
+                'url': result['url']
+            })
+        else:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No Wikipedia article found'
+            }, status=404)
+            
     except Exception as e:
         return JsonResponse({
             'status': 'error',

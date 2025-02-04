@@ -321,6 +321,27 @@
             cursor: not-allowed;
         }
 
+        .wiki-btn {
+            padding: 0.375rem 0.75rem;
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            margin-left: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .wiki-btn:hover {
+            background-color: #138496;
+        }
+
+        .wiki-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
         .description-cell {
             display: flex;
             flex-direction: column;
@@ -437,20 +458,25 @@
                             <div class="description-cell">
                                 <div>{{ poi.description|default:"" }}</div>
                                 <div class="reworded"></div>
-                                <button 
-                                    class="reword-btn" 
-                                    data-poi-name="{{ poi.name|escapejs }}"
-                                    onclick="rewordDescription({{ poi.id }}, this.dataset.poiName, this)"
-                                >
-                                    {% if poi.description %}Reword Description{% else %}Create Description{% endif %}
-                                </button>
-                                <button 
-                                    class="save-btn" 
-                                    onclick="saveDescription({{ poi.id }}, this)"
-                                    style="display: none;"
-                                >
-                                    Save Description
-                                </button>
+                                <div class="button-group">
+                                    <button 
+                                        class="reword-btn" 
+                                        data-poi-name="{{ poi.name }}"
+                                        onclick="rewordDescription({{ poi.id }}, this.dataset.poiName, this)"
+                                    >
+                                        {% if poi.description %}Reword Description{% else %}Create Description{% endif %}
+                                    </button>
+                                    <button 
+                                        class="wiki-btn" 
+                                        data-poi-name="{{ poi.name }}"
+                                        onclick="getWikipediaDescription(this.dataset.poiName, this)"
+                                    >Get Wikipedia</button>
+                                    <button 
+                                        class="save-btn" 
+                                        onclick="saveDescription({{ poi.id }}, this)"
+                                        style="display: none;"
+                                    >Save Description</button>
+                                </div>
                             </div>
                         </td>
                         <td {% if not poi.latitude and not poi.longitude %}class="empty-cell"{% endif %}>
@@ -1104,6 +1130,47 @@
             } finally {
                 saveButton.disabled = false;
                 saveButton.textContent = 'Save Description';
+            }
+        }
+
+        async function getWikipediaDescription(poiName, button) {
+            const cell = button.closest('.description-cell');
+            const rewordedText = cell.querySelector('.reworded');
+            const saveButton = cell.querySelector('.save-btn');
+            const originalButton = button.textContent;
+            
+            // Disable button and show loading state
+            button.disabled = true;
+            button.textContent = 'Searching...';
+            rewordedText.textContent = 'Searching Wikipedia...';
+            saveButton.style.display = 'none';
+            
+            try {
+                const response = await fetch('/generate/wikipedia/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: `query=${poiName}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.summary) {
+                    rewordedText.textContent = data.summary;
+                    saveButton.style.display = 'block';
+                } else if (data.message) {
+                    rewordedText.textContent = 'Error: ' + data.message;
+                } else {
+                    rewordedText.textContent = 'No Wikipedia article found.';
+                }
+            } catch (error) {
+                rewordedText.textContent = 'Error: ' + error.message;
+            } finally {
+                // Reset button state
+                button.disabled = false;
+                button.textContent = originalButton;
             }
         }
     </script>
