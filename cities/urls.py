@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import edits
+from .views import edits, images
 
 urlpatterns = [
     path('', views.city_list, name='city_list'),
@@ -30,12 +30,12 @@ urlpatterns = [
     path('city/<str:city_name>/lists/<int:list_id>/append/', views.append_to_list, name='append_to_list'),
     path('city/<str:city_name>/tasks/<str:task_id>/execute/', views.execute_task, name='execute_task'),
     path('tasks/<str:task_id>/status/', views.check_task_status, name='check_task_status'),
-    path('city/<str:city_name>/poi/<int:poi_id>/fetch_image/', views.fetch_poi_image, name='fetch_poi_image'),
-    path('city/<str:city_name>/poi/<int:poi_id>/delete_image/', views.delete_poi_image, name='delete_poi_image'),
-    path('city/<str:city_name>/poi/<int:poi_id>/save_image/', views.save_poi_image, name='save_poi_image'),
-    path('city/<str:city_name>/fetch_image/', views.fetch_city_image, name='fetch_city_image'),
-    path('city/<str:city_name>/save_image/', views.save_city_image, name='save_city_image'),
-    path('city/<str:city_name>/delete_image/', views.delete_city_image, name='delete_city_image'),
+    path('city/<str:city_name>/poi/<int:poi_id>/fetch_image/', views.images.fetch_poi_image, name='fetch_poi_image'),
+    path('city/<str:city_name>/poi/<int:poi_id>/delete_image/', views.images.delete_poi_image, name='delete_poi_image'),
+    path('city/<str:city_name>/poi/<int:poi_id>/save_image/', views.images.save_poi_image, name='save_poi_image'),
+    path('city/<str:city_name>/fetch_image/', views.images.fetch_city_image, name='fetch_city_image'),
+    path('city/<str:city_name>/save_image/', views.images.save_city_image, name='save_city_image'),
+    path('city/<str:city_name>/delete_image/', views.images.delete_city_image, name='delete_city_image'),
     path('city/<str:city_name>/update_about/', views.update_about, name='update_about'),
     path('city/<str:city_name>/export/', views.export_city, name='export_city'),
     path('city/poi/<int:poi_id>/update_description/', edits.update_poi_description, name='update_poi_description'),
