@@ -279,6 +279,60 @@
         .delete-btn:hover {
             color: #bd2130;
         }
+
+        .reword-btn {
+            padding: 0.375rem 0.75rem;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .reword-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .reword-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .save-btn {
+            padding: 0.375rem 0.75rem;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            display: none;
+            font-size: 0.875rem;
+        }
+
+        .save-btn:hover {
+            background-color: #218838;
+        }
+
+        .save-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        .description-cell {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .reworded {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background-color: #f8f9fa;
+            border-radius: 0.25rem;
+            white-space: pre-wrap;
+        }
     </style>
 
     <div id="selectionActions" class="selection-actions" style="display: none; margin-bottom: 1em;">
@@ -379,7 +433,26 @@
                                 <br><small>(Part of {{ poi.district.parent_district.name }})</small>
                             {% endif %}
                         </td>
-                        <td {% if not poi.description %}class="empty-cell"{% endif %}>{{ poi.description|truncatewords:30|default:"" }}</td>
+                        <td {% if not poi.description %}class="empty-cell"{% endif %}>
+                            <div class="description-cell">
+                                <div>{{ poi.description|default:"" }}</div>
+                                <div class="reworded"></div>
+                                <button 
+                                    class="reword-btn" 
+                                    data-poi-name="{{ poi.name|escapejs }}"
+                                    onclick="rewordDescription({{ poi.id }}, this.dataset.poiName, this)"
+                                >
+                                    {% if poi.description %}Reword Description{% else %}Create Description{% endif %}
+                                </button>
+                                <button 
+                                    class="save-btn" 
+                                    onclick="saveDescription({{ poi.id }}, this)"
+                                    style="display: none;"
+                                >
+                                    Save Description
+                                </button>
+                            </div>
+                        </td>
                         <td {% if not poi.latitude and not poi.longitude %}class="empty-cell"{% endif %}>
                             {% if poi.latitude and poi.longitude %}
                                 {{ poi.latitude }}, {{ poi.longitude }}
@@ -953,6 +1026,85 @@
             .catch(function(error) {
                 alert('Error deleting POI: ' + error);
             });
+        }
+
+        async function rewordDescription(poiId, poiName, button) {
+            const cell = button.closest('.description-cell');
+            const description = cell.querySelector('div:first-child').textContent;
+            const rewordedText = cell.querySelector('.reworded');
+            const saveButton = cell.querySelector('.save-btn');
+            const originalButton = button.textContent;
+            
+            // Disable button and show loading state
+            button.disabled = true;
+            button.textContent = 'Rewording...';
+            rewordedText.textContent = 'Generating...';
+            saveButton.style.display = 'none';
+            
+            try {
+                const response = await fetch('/generate/reword/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: `text=${encodeURIComponent(description)}&name=${encodeURIComponent(poiName)}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.content) {
+                    // Update the reworded description cell with the new content
+                    rewordedText.textContent = data.content;
+                    saveButton.style.display = 'block';
+                } else if (data.message) {
+                    rewordedText.textContent = 'Error: ' + data.message;
+                }
+            } catch (error) {
+                rewordedText.textContent = 'Error: ' + error.message;
+            } finally {
+                // Reset button state
+                button.disabled = false;
+                button.textContent = originalButton;
+            }
+        }
+
+        async function saveDescription(poiId, saveButton) {
+            const cell = saveButton.closest('.description-cell');
+            const rewordedText = cell.querySelector('.reworded').textContent;
+            const originalText = cell.querySelector('div:first-child');
+            
+            saveButton.disabled = true;
+            saveButton.textContent = 'Saving...';
+            
+            try {
+                const response = await fetch(`/city/poi/${poiId}/update_description/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    },
+                    body: `description=${encodeURIComponent(rewordedText)}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    // Update the original description
+                    originalText.textContent = rewordedText;
+                    // Hide the save button
+                    saveButton.style.display = 'none';
+                    // Clear the reworded text
+                    cell.querySelector('.reworded').textContent = '';
+                } else {
+                    alert('Error saving description: ' + data.message);
+                }
+            } catch (error) {
+                alert('Error saving description: ' + error.message);
+            } finally {
+                saveButton.disabled = false;
+                saveButton.textContent = 'Save Description';
+            }
         }
     </script>
 {% else %}
