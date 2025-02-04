@@ -353,6 +353,13 @@
             background-color: #f8f9fa;
             border-radius: 0.25rem;
             white-space: pre-wrap;
+            width: 100%;
+            min-height: 100px;
+            border: 1px solid #dee2e6;
+            font-family: inherit;
+            font-size: inherit;
+            resize: none;
+            overflow: hidden;
         }
     </style>
 
@@ -457,7 +464,7 @@
                         <td {% if not poi.description %}class="empty-cell"{% endif %}>
                             <div class="description-cell">
                                 <div>{{ poi.description|default:"" }}</div>
-                                <div class="reworded"></div>
+                                <textarea class="reworded"></textarea>
                                 <div class="button-group">
                                     <button 
                                         class="reword-btn" 
@@ -1054,6 +1061,11 @@
             });
         }
 
+        function autoResizeTextarea(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+        }
+
         async function rewordDescription(poiId, poiName, button) {
             const cell = button.closest('.description-cell');
             const description = cell.querySelector('div:first-child').textContent;
@@ -1061,10 +1073,14 @@
             const saveButton = cell.querySelector('.save-btn');
             const originalButton = button.textContent;
             
+            // Set up auto-resize for the textarea
+            rewordedText.addEventListener('input', () => autoResizeTextarea(rewordedText));
+            
             // Disable button and show loading state
             button.disabled = true;
             button.textContent = 'Rewording...';
-            rewordedText.textContent = 'Generating...';
+            rewordedText.value = 'Generating...';
+            autoResizeTextarea(rewordedText);
             saveButton.style.display = 'none';
             
             try {
@@ -1080,14 +1096,16 @@
                 const data = await response.json();
                 
                 if (data.content) {
-                    // Update the reworded description cell with the new content
-                    rewordedText.textContent = data.content;
+                    rewordedText.value = data.content;
+                    autoResizeTextarea(rewordedText);
                     saveButton.style.display = 'block';
                 } else if (data.message) {
-                    rewordedText.textContent = 'Error: ' + data.message;
+                    rewordedText.value = 'Error: ' + data.message;
+                    autoResizeTextarea(rewordedText);
                 }
             } catch (error) {
-                rewordedText.textContent = 'Error: ' + error.message;
+                rewordedText.value = 'Error: ' + error.message;
+                autoResizeTextarea(rewordedText);
             } finally {
                 // Reset button state
                 button.disabled = false;
@@ -1097,7 +1115,7 @@
 
         async function saveDescription(poiId, saveButton) {
             const cell = saveButton.closest('.description-cell');
-            const rewordedText = cell.querySelector('.reworded').textContent;
+            const rewordedText = cell.querySelector('.reworded').value;
             const originalText = cell.querySelector('div:first-child');
             
             saveButton.disabled = true;
@@ -1116,12 +1134,9 @@
                 const data = await response.json();
                 
                 if (data.status === 'success') {
-                    // Update the original description
                     originalText.textContent = rewordedText;
-                    // Hide the save button
                     saveButton.style.display = 'none';
-                    // Clear the reworded text
-                    cell.querySelector('.reworded').textContent = '';
+                    cell.querySelector('.reworded').value = '';
                 } else {
                     alert('Error saving description: ' + data.message);
                 }
@@ -1139,10 +1154,14 @@
             const saveButton = cell.querySelector('.save-btn');
             const originalButton = button.textContent;
             
+            // Set up auto-resize for the textarea
+            rewordedText.addEventListener('input', () => autoResizeTextarea(rewordedText));
+            
             // Disable button and show loading state
             button.disabled = true;
             button.textContent = 'Searching...';
-            rewordedText.textContent = 'Searching Wikipedia...';
+            rewordedText.value = 'Searching Wikipedia...';
+            autoResizeTextarea(rewordedText);
             saveButton.style.display = 'none';
             
             try {
@@ -1158,15 +1177,19 @@
                 const data = await response.json();
                 
                 if (data.summary) {
-                    rewordedText.textContent = data.summary;
+                    rewordedText.value = data.summary;
+                    autoResizeTextarea(rewordedText);
                     saveButton.style.display = 'block';
                 } else if (data.message) {
-                    rewordedText.textContent = 'Error: ' + data.message;
+                    rewordedText.value = 'Error: ' + data.message;
+                    autoResizeTextarea(rewordedText);
                 } else {
-                    rewordedText.textContent = 'No Wikipedia article found.';
+                    rewordedText.value = 'No Wikipedia article found.';
+                    autoResizeTextarea(rewordedText);
                 }
             } catch (error) {
-                rewordedText.textContent = 'Error: ' + error.message;
+                rewordedText.value = 'Error: ' + error.message;
+                autoResizeTextarea(rewordedText);
             } finally {
                 // Reset button state
                 button.disabled = false;
