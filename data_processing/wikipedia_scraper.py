@@ -30,7 +30,7 @@ def search_wikipedia(query: str, lat: Optional[float] = None, lon: Optional[floa
     try:
         # Try geosearch first if we have coordinates
         if lat is not None and lon is not None:
-            search_results = wikipedia.geosearch(lat, lon, title=query, results=5, radius=10)
+            search_results = wikipedia.geosearch(lat, lon, title=query, results=5, radius=20)
         else:
             search_results = wikipedia.search(query, results=1)
         
