@@ -551,6 +551,7 @@
                                 <a href="{% url 'poi_history' city.name poi.id %}" class="btn btn-sm btn-info">History</a>
                                 <button onclick="openEditModal({{ poi.id }}, '{{ poi.name|escapejs }}', '{{ poi.category }}', '{{ poi.sub_category|escapejs }}', '{{ poi.description|escapejs }}', '{{ poi.latitude|default:'' }}', '{{ poi.longitude|default:'' }}', '{{ poi.address|escapejs|default:'' }}', '{{ poi.phone|escapejs|default:'' }}', '{{ poi.website|escapejs|default:'' }}', '{{ poi.hours|escapejs|default:'' }}', {{ poi.rank|default:0 }}, {{ poi.district.id|default:'null' }})" class="btn btn-sm btn-primary">Edit</button>
                                 <button class="btn btn-sm btn-danger" onclick="deletePoi({{ poi.id }}, '{{ poi.name|escapejs }}')">
+                                    Delete
                                 </button>
                             </div>
                         </td>
