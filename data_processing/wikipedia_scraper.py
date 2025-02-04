@@ -1,5 +1,16 @@
 import wikipedia
+import re
 from typing import Optional, Dict, Union
+
+def strip_brackets(text: str) -> str:
+    """Remove text within brackets (both square and round) from the text."""
+    # First remove square brackets
+    text = re.sub(r'\[[^\]]*\]', '', text)
+    # Then remove round brackets
+    text = re.sub(r'\([^\)]*\)', '', text)
+    # Clean up any double spaces created
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
 
 def search_wikipedia(query: str) -> Dict[str, Union[str, None]]:
     """
@@ -36,7 +47,10 @@ def search_wikipedia(query: str) -> Dict[str, Union[str, None]]:
                 continue
             if '==' in para:  # Stop at first section header
                 break
-            intro.append(para)
+            # Strip brackets from each paragraph
+            cleaned_para = strip_brackets(para)
+            if cleaned_para:  # Only add if there's content after stripping
+                intro.append(cleaned_para)
         
         summary = '\n\n'.join(intro)
         
@@ -57,7 +71,9 @@ def search_wikipedia(query: str) -> Dict[str, Union[str, None]]:
                     continue
                 if '==' in para:
                     break
-                intro.append(para)
+                cleaned_para = strip_brackets(para)
+                if cleaned_para:
+                    intro.append(cleaned_para)
             
             summary = '\n\n'.join(intro)
             
