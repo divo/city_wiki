@@ -1,5 +1,6 @@
 """Module for handling text generation using OpenAI's API."""
 
+import os
 import json
 from django.shortcuts import get_object_or_404, render
 from django.http import JsonResponse
@@ -56,7 +57,7 @@ def generate_text(request, city_name):
             all_poi_names.add(poi.name)
         
         # Initialize OpenAI client
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
         
         # Get the prompt from the request
         prompt = request.POST.get('prompt', '')
@@ -240,8 +241,8 @@ def generate_list(request, city_name):
             
             # Initialize OpenAI client
             try:
-                f.write(f"Initializing OpenAI client with key: {settings.OPENAI_API_KEY[:10]}...\n")
-                client = OpenAI(api_key=settings.OPENAI_API_KEY)
+                f.write(f"Initializing OpenAI client with key")
+                client = OpenAI(api_key=os.environ.get('OPENAI_API_KEY'))
                 f.write("OpenAI client initialized successfully\n")
             except Exception as e:
                 f.write(f"Failed to initialize OpenAI client: {str(e)}\n")
