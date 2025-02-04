@@ -308,7 +308,7 @@
             border-radius: 0.25rem;
             cursor: pointer;
             margin-top: 0.5rem;
-            display: none;
+            margin-left: 0.5rem;
             font-size: 0.875rem;
         }
 
@@ -492,8 +492,7 @@
                         </td>
                         <td {% if not poi.description %}class="empty-cell"{% endif %}>
                             <div class="description-cell {% if poi.has_revisions %}has-revisions{% else %}no-revisions{% endif %}">
-                                <div>{{ poi.description|default:"" }}</div>
-                                <textarea class="reworded"></textarea>
+                                <textarea class="reworded">{{ poi.description|default:"" }}</textarea>
                                 <div class="button-group">
                                     <button 
                                         class="reword-btn" 
@@ -520,7 +519,6 @@
                                     <button 
                                         class="save-btn" 
                                         onclick="saveDescription({{ poi.id }}, this)"
-                                        style="display: none;"
                                     >Save Description</button>
                                 </div>
                             </div>
@@ -1107,10 +1105,10 @@
 
         async function rewordDescription(poiId, poiName, button) {
             const cell = button.closest('.description-cell');
-            const description = cell.querySelector('div:first-child').textContent;
             const rewordedText = cell.querySelector('.reworded');
             const saveButton = cell.querySelector('.save-btn');
             const originalButton = button.textContent;
+            const currentText = rewordedText.value;
             
             // Set up auto-resize for the textarea
             rewordedText.addEventListener('input', () => autoResizeTextarea(rewordedText));
@@ -1120,7 +1118,6 @@
             button.textContent = 'Rewording...';
             rewordedText.value = 'Generating...';
             autoResizeTextarea(rewordedText);
-            saveButton.style.display = 'none';
             
             try {
                 const response = await fetch('/generate/reword/', {
@@ -1129,7 +1126,7 @@
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
                     },
-                    body: `text=${encodeURIComponent(description)}&name=${encodeURIComponent(poiName)}&breif=true`
+                    body: `text=${encodeURIComponent(currentText)}&name=${encodeURIComponent(poiName)}&breif=true`
                 });
                 
                 const data = await response.json();
@@ -1139,7 +1136,6 @@
                     const trimmedContent = data.content.replace(/^\n+|\n+$/g, '');
                     rewordedText.value = trimmedContent;
                     autoResizeTextarea(rewordedText);
-                    saveButton.style.display = 'block';
                 } else if (data.message) {
                     rewordedText.value = 'Error: ' + data.message;
                     autoResizeTextarea(rewordedText);
@@ -1157,7 +1153,6 @@
         async function saveDescription(poiId, saveButton) {
             const cell = saveButton.closest('.description-cell');
             const rewordedText = cell.querySelector('.reworded').value;
-            const originalText = cell.querySelector('div:first-child');
             
             saveButton.disabled = true;
             saveButton.textContent = 'Saving...';
@@ -1175,9 +1170,7 @@
                 const data = await response.json();
                 
                 if (data.status === 'success') {
-                    originalText.textContent = rewordedText;
-                    saveButton.style.display = 'none';
-                    cell.querySelector('.reworded').value = '';
+                    // Success message or visual feedback could be added here
                 } else {
                     alert('Error saving description: ' + data.message);
                 }
@@ -1215,7 +1208,6 @@
             button.textContent = 'Searching...';
             rewordedText.value = 'Searching Wikipedia...';
             autoResizeTextarea(rewordedText);
-            saveButton.style.display = 'none';
             
             try {
                 const response = await fetch('/generate/wikipedia/', {
@@ -1232,7 +1224,6 @@
                 if (data.summary) {
                     rewordedText.value = data.summary;
                     autoResizeTextarea(rewordedText);
-                    saveButton.style.display = 'block';
                 } else if (data.message) {
                     rewordedText.value = 'Error: ' + data.message;
                     autoResizeTextarea(rewordedText);
@@ -1276,7 +1267,6 @@
             button.textContent = 'Searching Wiki...';
             rewordedText.value = 'Searching Wikipedia...';
             autoResizeTextarea(rewordedText);
-            saveButton.style.display = 'none';
             
             try {
                 // First get Wikipedia content
@@ -1318,7 +1308,6 @@
                     const trimmedContent = generateData.content.replace(/^\n+|\n+$/g, '');
                     rewordedText.value = trimmedContent;
                     autoResizeTextarea(rewordedText);
-                    saveButton.style.display = 'block';
                 } else if (generateData.message) {
                     rewordedText.value = 'Error generating: ' + generateData.message;
                     autoResizeTextarea(rewordedText);
@@ -1347,7 +1336,6 @@
             button.textContent = 'Searching...';
             rewordedText.value = 'Searching Wikipedia...';
             autoResizeTextarea(rewordedText);
-            saveButton.style.display = 'none';
             
             try {
                 const response = await fetch('/generate/wikipedia/', {
@@ -1364,7 +1352,6 @@
                 if (wikiData.summary) {
                     rewordedText.value = wikiData.summary;
                     autoResizeTextarea(rewordedText);
-                    saveButton.style.display = 'block';
                 } else if (wikiData.message) {
                     rewordedText.value = 'Error: ' + wikiData.message;
                     autoResizeTextarea(rewordedText);
