@@ -50,7 +50,7 @@ def detect_duplicate_pois(poi1, poi2):
     
     if name_similarity and (close_coordinates or address_similarity):
         is_duplicate = True
-        reasons.append("Similar names")
+        reasons.append("Similar names, coordinates or addresses")
     
 #    if same_category and (close_coordinates or address_similarity):
 #        is_duplicate = True
