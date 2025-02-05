@@ -176,8 +176,6 @@ def generate_list(request, city_name):
                 latitude__isnull=False, 
                 longitude__isnull=False,
                 # Ensure both coordinates are non-zero
-                latitude__gt=0,
-                longitude__gt=0,
                 category='see'  # Only include POIs in the "see" category
             ).select_related('district')
             
