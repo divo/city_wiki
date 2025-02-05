@@ -48,16 +48,16 @@ def detect_duplicate_pois(poi1, poi2):
     # Determine if this pair should be flagged as potential duplicates
     is_duplicate = False
     
-    if name_similarity:
+    if name_similarity and (close_coordinates or address_similarity):
         is_duplicate = True
         reasons.append("Similar names")
     
-    if same_category and (close_coordinates or address_similarity):
-        is_duplicate = True
-        if close_coordinates:
-            reasons.append("Same category and very close locations")
-        if address_similarity:
-            reasons.append("Same category and similar addresses")
+#    if same_category and (close_coordinates or address_similarity):
+#        is_duplicate = True
+#        if close_coordinates:
+#            reasons.append("Same category and very close locations")
+#        if address_similarity:
+#            reasons.append("Same category and similar addresses")
     
     return is_duplicate, reasons
 
