@@ -48,12 +48,9 @@
     }
     /* Marker styles */
     .marker {
-        background-position: center;
-        background-repeat: no-repeat;
         background-size: contain;
+        background-repeat: no-repeat;
         cursor: pointer;
-        transition: transform 0.2s;
-        display: block;
     }
     .marker:hover {
         transform: scale(1.2);
@@ -67,19 +64,30 @@
     }
     .poi-popup h3 {
         margin: 0 0 10px 0;
-        color: #333;
+    }
+    .poi-popup .category {
+        display: inline-block;
+        padding: 2px 6px;
+        background: #e9ecef;
+        border-radius: 4px;
+        margin-right: 5px;
+        font-size: 0.9em;
+    }
+    .poi-popup .delete-btn {
+        margin-top: 10px;
+        padding: 4px 8px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .poi-popup .delete-btn:hover {
+        background: #c82333;
     }
     .poi-popup p {
         margin: 5px 0;
         color: #666;
-    }
-    .poi-popup .category {
-        display: inline-block;
-        padding: 2px 8px;
-        background: #e9ecef;
-        border-radius: 12px;
-        font-size: 0.9em;
-        margin-bottom: 8px;
     }
     .map-filters {
         margin-top: 15px;
@@ -253,14 +261,19 @@
                     
                     pois.forEach(poi => {
                         if (poi.latitude && poi.longitude) {
+                            const escapedName = escapeHtml(poi.name);
+                            const escapedDescription = poi.description ? escapeHtml(poi.description) : '';
+                            const escapedAddress = poi.address ? escapeHtml(poi.address) : '';
+                            
                             const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(`
                                 <div class="poi-popup">
-                                    <h3>${poi.name}</h3>
-                                    <span class="category">${poi.category}</span>
-                                    ${poi.sub_category ? `<span class="category">${poi.sub_category}</span>` : ''}
-                                    ${poi.description ? `<p>${poi.description}</p>` : ''}
-                                    ${poi.address ? `<p><strong>Address:</strong> ${poi.address}</p>` : ''}
-                                    ${poi.website ? `<p><a href="${poi.website}" target="_blank">Website</a></p>` : ''}
+                                    <h3>${escapedName}</h3>
+                                    <span class="category">${escapeHtml(poi.category)}</span>
+                                    ${poi.sub_category ? `<span class="category">${escapeHtml(poi.sub_category)}</span>` : ''}
+                                    ${escapedDescription ? `<p>${escapedDescription}</p>` : ''}
+                                    ${escapedAddress ? `<p><strong>Address:</strong> ${escapedAddress}</p>` : ''}
+                                    ${poi.website ? `<p><a href="${escapeHtml(poi.website)}" target="_blank">Website</a></p>` : ''}
+                                    <button class="delete-btn" onclick="deletePoi(${Number(poi.id)}, '${escapedName.replace(/'/g, "\\'")}')">Delete POI</button>
                                 </div>
                             `);
 
@@ -288,6 +301,39 @@
         {% else %}
             document.getElementById('map').innerHTML = 'Error: Mapbox token not configured. Please check server configuration.';
         {% endif %}
+    }
+
+    async function deletePoi(poiId, poiName) {
+        if (!confirm(`Are you sure you want to delete "${poiName}"?`)) {
+            return;
+        }
+        
+        try {
+            const cityName = encodeURIComponent('{{ city.name }}');
+            const response = await fetch(`/city/${cityName}/poi/${poiId}/delete/`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                // Refresh the page to update the map
+                window.location.reload();
+            } else {
+                alert('Error deleting POI: ' + data.message);
+            }
+        } catch (error) {
+            alert('Error deleting POI: ' + error);
+        }
+    }
+
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
 </script>
 {% endblock %} 

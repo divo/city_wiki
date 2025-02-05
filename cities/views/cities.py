@@ -357,6 +357,7 @@ def city_map(request, city_name):
 
     # Convert POIs to JSON for the template
     pois_json = json.dumps([{
+        'id': poi.id,
         'name': poi.name,
         'category': poi.category,
         'sub_category': poi.sub_category,
