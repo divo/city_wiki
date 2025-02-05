@@ -37,7 +37,8 @@ def generate_text(request, city_name):
         # Get POIs with coordinates
         pois = city.points_of_interest.filter(
             latitude__isnull=False, 
-            longitude__isnull=False
+            longitude__isnull=False,
+            category='see'  # Only include POIs in the "see" category
         ).select_related('district')
         
         # Prepare POI data - just names grouped by category and district
@@ -176,7 +177,8 @@ def generate_list(request, city_name):
                 longitude__isnull=False,
                 # Ensure both coordinates are non-zero
                 latitude__gt=0,
-                longitude__gt=0
+                longitude__gt=0,
+                category='see'  # Only include POIs in the "see" category
             ).select_related('district')
             
             f.write(f"Found {len(pois)} POIs with valid coordinates for {city_name}\n")
