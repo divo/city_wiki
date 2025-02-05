@@ -272,6 +272,7 @@
                                     ${poi.sub_category ? `<span class="category">${escapeHtml(poi.sub_category)}</span>` : ''}
                                     ${escapedDescription ? `<p>${escapedDescription}</p>` : ''}
                                     ${escapedAddress ? `<p><strong>Address:</strong> ${escapedAddress}</p>` : ''}
+                                    <p><strong>Coordinates:</strong> ${poi.latitude.toFixed(6)}, ${poi.longitude.toFixed(6)}</p>
                                     ${poi.website ? `<p><a href="${escapeHtml(poi.website)}" target="_blank">Website</a></p>` : ''}
                                     <button class="delete-btn" onclick="deletePoi(${Number(poi.id)}, '${escapedName.replace(/'/g, "\\'")}')">Delete POI</button>
                                 </div>
