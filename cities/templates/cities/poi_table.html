@@ -395,6 +395,7 @@
     <div id="selectionActions" class="selection-actions" style="display: none; margin-bottom: 1em;">
         <span id="selectedCount">0 POIs selected</span>
         <button onclick="handleMergeSelected()" class="btn btn-primary">Merge Selected</button>
+        <button onclick="handleDeleteSelected()" class="btn btn-danger">Delete Selected (Untested)</button>
         
         <div class="list-creation" style="display: inline-block; margin-left: 1em;">
             <input type="text" id="listTitle" placeholder="Enter list title" class="form-control" style="display: inline-block; width: auto;">
@@ -1368,6 +1369,61 @@
                 button.disabled = false;
                 button.textContent = originalButton;
             }
+        }
+
+        function handleDeleteSelected() {
+            const selectedIds = Array.from(selectedRows);
+            if (selectedIds.length === 0) {
+                alert('Please select at least one POI to delete');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete ${selectedIds.length} selected POIs? This action cannot be undone.`)) {
+                return;
+            }
+
+            let deletePromises = selectedIds.map(poiId => 
+                fetch(`/city/{{ city.name }}/poi/${poiId}/delete/`, {
+                    method: 'DELETE'
+                }).then(response => response.json())
+            );
+
+            Promise.all(deletePromises)
+                .then(results => {
+                    let successCount = 0;
+                    let errors = [];
+
+                    results.forEach((data, index) => {
+                        if (data.status === 'success') {
+                            successCount++;
+                            // Find and remove the row using data-poi-id attribute
+                            const row = document.querySelector(`tr[data-poi-id="${selectedIds[index]}"]`);
+                            if (row) {
+                                row.remove();
+                            }
+                        } else {
+                            errors.push(`Error deleting POI ${selectedIds[index]}: ${data.message}`);
+                        }
+                    });
+
+                    // Show success message
+                    const alert = document.createElement('div');
+                    alert.className = 'alert alert-success';
+                    alert.textContent = `Successfully deleted ${successCount} POIs`;
+                    if (errors.length > 0) {
+                        alert.textContent += `. Errors: ${errors.join('; ')}`;
+                    }
+                    document.querySelector('.container').insertBefore(alert, document.querySelector('.table-responsive'));
+
+                    // Clear selection and update UI
+                    selectedRows.clear();
+                    updateSelectionUI();
+
+                    setTimeout(() => alert.remove(), 3000);
+                })
+                .catch(error => {
+                    alert('Error deleting POIs: ' + error);
+                });
         }
     </script>
 {% else %}
