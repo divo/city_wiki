@@ -34,6 +34,9 @@ class WikivoyageScraper:
     
     def __init__(self):
         self.session = mwapi.Session('https://en.wikivoyage.org', user_agent='CityWiki/1.0')
+        # When True, only collect district links that are explicitly defined in regionlist templates
+        # When False, collect all wikilinks from sections titled "Districts" or "Boroughs". This can decend unrelated pages
+        self.use_regionlist_districts = True
     
     # from data_processing.wikivoyage_scraper import WikivoyageScraper
     # scraper = WikivoyageScraper()
@@ -51,7 +54,7 @@ class WikivoyageScraper:
         
         if 'error' in response:
             raise Exception(f"Failed to fetch {city_name}: {response['error']}")
-            
+
         wikitext = response['parse']['wikitext']['*']
         parsed = wtp.parse(wikitext)
         
@@ -74,14 +77,23 @@ class WikivoyageScraper:
         if paragraphs:
             about_text = '\n\n'.join(self._clean_text(p) for p in paragraphs)
         
+        # Process sections based on the district collection strategy
         for section in parsed.sections:
-            if section.title == "Districts":
-                for wikilink in section.wikilinks:
-                    district_pages.add(wikilink.title)
-            else:
+            if self.use_regionlist_districts:
                 category = self._determine_category(section.title)
                 if category:
                     self._parse_section(section, category, poi_dict)
+                district_pages.update(self._collect_district_pages(section))
+            else:
+                # Original approach: collect all wikilinks from Districts sections
+                if section.title in ["Districts", "Boroughs"]:
+                    for wikilink in section.wikilinks:
+                        if wikilink.title:
+                            district_pages.add(wikilink.title)
+                else:
+                    category = self._determine_category(section.title)
+                    if category:
+                        self._parse_section(section, category, poi_dict)
         
         return list(poi_dict.values()), list(district_pages), about_text  # Convert back to list before returning
     
@@ -212,3 +224,28 @@ class WikivoyageScraper:
             images=[args['image']] if 'image' in args else [],
             rank=rank
         )
+
+    def _collect_district_pages(self, section: wtp.Section, visited: Optional[set] = None, depth: int = 0, max_depth: int = 10) -> set:
+        """Collect district pages from regionlist templates in a section."""
+        pages = set()
+        
+        # First collect all region names from regionlist templates
+        region_names = set()
+        for template in section.templates:
+            if template.name.lower().strip() == 'regionlist':
+                for arg in template.arguments:
+                    arg_name = arg.name.strip().lower()
+                    if arg_name.startswith('region') and arg_name.endswith('name'):
+                        region_name = self._clean_wiki_links(arg.value.strip())
+                        if region_name:
+                            region_names.add(region_name)
+        
+        # Then find wikilinks that match these region names
+        if region_names:
+            for wikilink in section.wikilinks:
+                if wikilink.title:
+                    link_text = self._clean_wiki_links(wikilink.text or wikilink.title)
+                    if link_text in region_names:
+                        pages.add(wikilink.title)
+        
+        return pages
