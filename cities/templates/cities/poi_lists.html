@@ -172,6 +172,12 @@
     tr.no-image:hover {
         background-color: #ffd9d9;  /* Slightly darker red on hover */
     }
+    .poi-count {
+        font-size: 0.9em;
+        color: #6c757d;
+        margin-left: 8px;
+        font-weight: normal;
+    }
 </style>
 
 <div class="container">
@@ -183,6 +189,7 @@
                 <div class="poi-list">
                     <h3>
                         <span>{{ list.title }}</span>
+                        <span class="poi-count">({{ list.pois.count }} POIs)</span>
                         <button onclick="deleteList({{ list.id }}, '{{ list.title|escapejs }}')" class="delete-btn">Delete</button>
                     </h3>
                     <table class="table table-bordered">
