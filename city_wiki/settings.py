@@ -148,7 +148,7 @@ CELERY_RESULT_SERIALIZER = 'json'
 
 # OpenAI Configuration
 # Set this in your environment or local_settings.py
-OPENAI_API_KEY = os.environ.get('OPEN_AI_KEY')
+OPENAI_API_KEY = os.environ.get('OPENAI_AI_KEY')
 OPENAI_MODEL = 'gpt-4-turbo-preview'  # Default model to use
 
 # Logging Configuration
