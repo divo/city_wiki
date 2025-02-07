@@ -176,7 +176,7 @@ def generate_list(request, city_name):
                 latitude__isnull=False, 
                 longitude__isnull=False,
                 # Ensure both coordinates are non-zero
-                category='see'  # Only include POIs in the "see" category
+                # category='see'  # Only include POIs in the "see" category
             ).select_related('district')
             
             f.write(f"Found {len(pois)} POIs with valid coordinates for {city_name}\n")
