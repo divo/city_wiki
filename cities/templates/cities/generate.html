@@ -680,7 +680,7 @@ document.getElementById('generateForm').addEventListener('submit', async functio
         }
         
         // Properly encode the city name for the URL
-        const encodedCityName = encodeURIComponent(citySelect.value).replace(/%20/g, '+');
+        const encodedCityName = encodeURIComponent(citySelect.value);
         
         const response = await fetch(`/city/${encodedCityName}/${endpoint}/`, {
             method: 'POST',
