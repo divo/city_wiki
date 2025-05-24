@@ -9,3 +9,4 @@ debug.log
 .env.*
 cities/views/__pycache__
 pbf
+.aider*
