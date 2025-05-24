@@ -36,7 +36,7 @@ class WikivoyageScraper:
         self.session = mwapi.Session('https://en.wikivoyage.org', user_agent='CityWiki/1.0')
         # When True, only collect district links that are explicitly defined in regionlist templates
         # When False, collect all wikilinks from sections titled "Districts" or "Boroughs". This can decend unrelated pages
-        self.use_regionlist_districts = True
+        self.use_regionlist_districts = False
     
     # from data_processing.wikivoyage_scraper import WikivoyageScraper
     # scraper = WikivoyageScraper()
@@ -86,7 +86,7 @@ class WikivoyageScraper:
                 district_pages.update(self._collect_district_pages(section))
             else:
                 # Original approach: collect all wikilinks from Districts sections
-                if section.title in ["Districts", "Boroughs"]:
+                if section.title in ["Districts", "Boroughs", " Cities and towns "]:
                     for wikilink in section.wikilinks:
                         if wikilink.title:
                             district_pages.add(wikilink.title)
