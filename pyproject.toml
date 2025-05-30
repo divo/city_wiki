@@ -10,6 +10,14 @@ dependencies = [
     "groq>=0.4.2",
     "wikipedia>=1.4.0",
     "perfect>=0.0.1",
+    "celery>=5.5.2",
+    "mwapi>=0.6.1",
+    "wikitextparser>=0.52.0",
+    "geopy>=2.4.1",
+    "pandas>=2.2.3",
+    "shapely>=2.1.1",
+    "geopandas>=1.0.1",
+    "pillow>=11.2.1",
 ]
 
 [tool.uv]
