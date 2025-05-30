@@ -64,13 +64,11 @@ def poi_revert(request, city_name, poi_id, revision_id):
 
     with reversion.create_revision():
         revision.revert()
-        reversion.set_comment(f"Reverted to version from {
-                              revision.date_created}")
+        reversion.set_comment(f"Reverted to version from {revision.date_created}")
         if request.user.is_authenticated:
             reversion.set_user(request.user)
 
-    messages.success(request, f"Successfully reverted {
-                     poi.name} to version from {revision.date_created}")
+    messages.success(request, f"Successfully reverted {poi.name} to version from {revision.date_created}")
     return redirect('poi_history', city_name=city_name, poi_id=poi_id)
 
 

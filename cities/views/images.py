@@ -20,8 +20,7 @@ def _fetch_wikimedia_images(search_query, limit=10):
     try:
         # Format and encode search query
         search_query = search_query.replace(' ', '+')
-        api_url = f"https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch={
-            search_query}&srnamespace=6&format=json&origin=*&srlimit={limit}"
+        api_url = f"https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch={search_query}&srnamespace=6&format=json&origin=*&srlimit={limit}"
 
         response = requests.get(api_url)
         data = response.json()
@@ -33,8 +32,7 @@ def _fetch_wikimedia_images(search_query, limit=10):
                 title = result['title']
 
                 # Get image info for each result
-                file_url = f"https://commons.wikimedia.org/w/api.php?action=query&titles={
-                    title}&prop=imageinfo&iiprop=url&format=json&origin=*"
+                file_url = f"https://commons.wikimedia.org/w/api.php?action=query&titles={title}&prop=imageinfo&iiprop=url&format=json&origin=*"
                 file_response = requests.get(file_url)
                 file_data = file_response.json()
 
@@ -82,14 +80,11 @@ def _fetch_pixabay_images(search_query, limit=10):
 
         # Format search query
         search_query = search_query.replace(' ', '+')
-        api_url = f"https://pixabay.com/api/?key={api_key}&q={
-            search_query}&image_type=photo&per_page={limit}"
-        logger.info(f"Making request to Pixabay API: {
-                    api_url.replace(api_key, '[REDACTED]')}")
+        api_url = f"https://pixabay.com/api/?key={api_key}&q={search_query}&image_type=photo&per_page={limit}"
+        logger.info(f"Making request to Pixabay API: {api_url.replace(api_key, '[REDACTED]')}")
 
         response = requests.get(api_url)
-        logger.info(f"Pixabay API response status code: {
-                    response.status_code}")
+        logger.info(f"Pixabay API response status code: {response.status_code}")
 
         if response.status_code != 200:
             logger.error(f"Pixabay API error: {response.text}")
@@ -198,8 +193,7 @@ def fetch_poi_image(request, city_name, poi_id):
         except json.JSONDecodeError:
             search_query = poi.name  # Default if no query provided
 
-        logger.info(f"Fetching images for POI {
-                    poi.name} with query: {search_query}")
+        logger.info(f"Fetching images for POI {poi.name} with query: {search_query}")
 
         # Get images from both sources
         wikimedia_result = _fetch_wikimedia_images(search_query)
@@ -226,14 +220,12 @@ def fetch_city_image(request, city_name):
         # Get custom search query from request body if provided
         try:
             data = json.loads(request.body)
-            search_query = data.get(
-                'search_query', f"{city.name} city skyline")
+            search_query = data.get('search_query', f"{city.name} city skyline")
         except json.JSONDecodeError:
             # Default if no query provided
             search_query = f"{city.name} city skyline"
 
-        logger.info(f"Fetching images for city {
-                    city_name} with query: {search_query}")
+        logger.info(f"Fetching images for city {city_name} with query: {search_query}")
 
         wikimedia_result = _fetch_wikimedia_images(search_query)
         pixabay_result = _fetch_pixabay_images(search_query)
@@ -260,8 +252,7 @@ def save_city_image(request, city_name):
         if not image_url:
             return JsonResponse({'status': 'error', 'message': 'No image URL provided'}, status=400)
 
-        logger.info(f"Attempting to save image for city {
-                    city_name} from URL: {image_url}")
+        logger.info(f"Attempting to save image for city {city_name} from URL: {image_url}")
 
         # Download the image
         image_content, error = _download_image(image_url)
@@ -317,8 +308,7 @@ def save_poi_image(request, city_name, poi_id):
         if not image_url:
             return JsonResponse({'status': 'error', 'message': 'No image URL provided'}, status=400)
 
-        logger.info(f"Attempting to save image for POI {
-                    poi.name} from URL: {image_url}")
+        logger.info(f"Attempting to save image for POI {poi.name} from URL: {image_url}")
 
         # Download the image
         image_content, error = _download_image(image_url)
