@@ -18,7 +18,7 @@ from cities.services.city_import import (
     create_or_get_district,
     import_city_data as import_city_data_service
 )
-from cities.enrich_tasks import geocode_city_coordinates, geocode_missing_addresses
+from cities.enrich_tasks import geocode_city_coordinates, geocode_missing_addresses, geocode_missing_coordinates
 from cities.models import City
 
 logger = logging.getLogger(__name__)
@@ -299,6 +299,44 @@ async def _geocode_missing_addresses(name: str, result: Dict[str, Any]) -> Dict[
     return result
 
 
+async def _geocode_missing_coordinates(name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Geocode missing coordinates for POIs with addresses.
+
+    Args:
+        name: Name of the city
+        result: Result dictionary from import and geocoding
+
+    Returns:
+        Updated result dictionary with coordinate geocoding information
+    """
+    logger = get_run_logger()
+    logger.info(f"Geocoding missing coordinates for POIs in {name}")
+
+    try:
+        # Get the city ID
+        get_city = sync_to_async(City.objects.get, thread_sensitive=True)
+        city = await get_city(name=name)
+
+        # Geocode missing coordinates
+        geocode_coords_async = sync_to_async(geocode_missing_coordinates, thread_sensitive=True)
+        coordinates_result = await geocode_coords_async(city.id)
+
+        # Add coordinate geocoding result to our main result
+        result['coordinate_geocoding'] = coordinates_result
+
+        logger.info(f"Coordinate geocoding for {name}: {coordinates_result.get('status', 'unknown')}, "
+                   f"Updated {coordinates_result.get('updated_count', 0)} POIs")
+    except City.DoesNotExist:
+        logger.error(f"City {name} not found in database for coordinate geocoding")
+        result['coordinate_geocoding'] = {'status': 'error', 'message': f"City {name} not found in database"}
+    except Exception as e:
+        logger.error(f"Error geocoding coordinates: {str(e)}")
+        result['coordinate_geocoding'] = {'status': 'error', 'message': str(e)}
+
+    return result
+
+
 def _format_initial_confirmation_message(name: str, result: Dict[str, Any]) -> str:
     """
     Format an initial confirmation message for the user after data import.
@@ -389,6 +427,9 @@ async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
         
         # Step 5: Geocode missing addresses for POIs
         result = await _geocode_missing_addresses(name, result)
+        
+        # Step 6: Geocode missing coordinates for POIs
+        result = await _geocode_missing_coordinates(name, result)
     else:
         logger.info(f"User did not confirm import for {name}, skipping geocoding steps")
 
