@@ -9,7 +9,8 @@ django.setup()
 
 # Now import Django-related modules
 from django.db import models
-from prefect import flow, task
+from prefect import flow, task, pause_flow_run, get_run_logger
+from asgiref.sync import sync_to_async
 from cities.services.city_import import (
     fetch_city_pois,
     create_or_update_city,
@@ -21,7 +22,10 @@ from cities.services.city_import import (
 logger = logging.getLogger(__name__)
 
 
-@task(name="fetch_wikivoyage_data")
+# Using the simplest pause approach, no need for a custom class
+
+
+@task(name="fetch_wikivoyage_data", retries=3)
 def fetch_wikivoyage_data(city_name: str, depth: int = 0) -> Dict[str, Any]:
     """
     Fetch city data from Wikivoyage.
@@ -52,7 +56,7 @@ def fetch_wikivoyage_data(city_name: str, depth: int = 0) -> Dict[str, Any]:
     }
 
 
-@task(name="process_city")
+@task(name="process_city", retries=2)
 def process_city(
     data: Dict[str, Any],
     city_name: str,
@@ -107,7 +111,7 @@ def process_city(
     }
 
 
-@flow(name="import_district")
+@task(name="import_district", retries=2)
 def import_district(
     district_name: str,
     root_city_name: str,
@@ -194,28 +198,67 @@ def import_wikivoyage_data(name: str, max_depth: int = 2) -> Dict[str, Any]:
 
 
 
-@flow(name="import_city")
-def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
+@flow(name="import_city", version="1.0")
+async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
     """
     Import a city and its districts from Wikivoyage.
-
+    
     Args:
         name: Name of the city to import
         max_depth: Maximum depth to recurse for districts
-
+        
     Returns:
         Dictionary with status information
     """
+    logger = get_run_logger()
     logger.info(f"Starting import flow for city: {name} (max_depth: {max_depth})")
-    result = import_wikivoyage_data(name, max_depth)
-
+    
+    # Use sync_to_async to properly bridge Django's sync code with our async flow
+    import_async = sync_to_async(import_wikivoyage_data, thread_sensitive=True)
+    result = await import_async(name, max_depth)
+    
+    # Prepare confirmation message
+    message = (f"City import complete for {name}. "
+              f"Imported {result.get('pois_count', 0)} POIs for the main city and "
+              f"processed {len(result.get('district_pages', []))} districts. "
+              f"Please review and confirm to finalize.")
+    
+    # Log the message for context
+    logger.info(message)
+    
+    # Pause for user confirmation using the simplest possible form
+    try:
+        # Use the simplest form with a single bool input
+        confirmation = await pause_flow_run(
+            wait_for_input=bool
+        )
+        
+        # Convert result to dict if it's not already
+        if not isinstance(result, dict):
+            result = dict(result)
+            
+        # Add confirmation to the result
+        result['user_confirmed'] = confirmation
+        logger.info(f"User confirmed: {confirmation}")
+            
+    except Exception as e:
+        logger.error(f"Error during pause/confirmation: {str(e)}")
+        if not isinstance(result, dict):
+            result = dict(result)
+        result['user_confirmed'] = False
+        result['confirmation_error'] = str(e)
+    
     return result
 
 
 if __name__ == "__main__":
-    import_city.deploy(
-        name="import-city-wikivoyage-deployment",
-        work_pool_name="city-import-pool",
-        image="city-import-image",
-        push=False
+    import asyncio
+    
+    # For local testing
+    # asyncio.run(import_city("Paris"))
+    
+    # For deployment
+    import_city.serve(
+        name="import-city-wikivoyage",
+        tags=["city", "wikivoyage"],
     )
