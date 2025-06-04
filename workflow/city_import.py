@@ -18,9 +18,10 @@ from cities.services.city_import import (
     create_or_get_district,
     import_city_data as import_city_data_service
 )
+from cities.enrich_tasks import geocode_city_coordinates
+from cities.models import City
 
 logger = logging.getLogger(__name__)
-
 
 # Using the simplest pause approach, no need for a custom class
 
@@ -198,6 +199,137 @@ def import_wikivoyage_data(name: str, max_depth: int = 2) -> Dict[str, Any]:
 
 
 
+async def _import_city_data(name: str, max_depth: int = 2) -> Dict[str, Any]:
+    """
+    Import city data using the synchronous import function.
+    
+    Args:
+        name: Name of the city to import
+        max_depth: Maximum depth to recurse for districts
+        
+    Returns:
+        Dictionary with import results
+    """
+    logger = get_run_logger()
+    logger.info(f"Importing city data for {name} (max_depth: {max_depth})")
+    
+    # Use sync_to_async to properly bridge Django's sync code with our async flow
+    import_async = sync_to_async(import_wikivoyage_data, thread_sensitive=True)
+    result = await import_async(name, max_depth)
+    
+    # Ensure result is a dictionary
+    if not isinstance(result, dict):
+        result = dict(result)
+    
+    return result
+
+
+async def _geocode_city(name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Geocode the city coordinates.
+    
+    Args:
+        name: Name of the city
+        result: Result dictionary from import
+        
+    Returns:
+        Updated result dictionary with geocoding information
+    """
+    logger = get_run_logger()
+    logger.info(f"Geocoding coordinates for city: {name}")
+    
+    try:
+        # First, get the city ID - wrap in sync_to_async to safely use Django ORM in async context
+        get_city = sync_to_async(City.objects.get, thread_sensitive=True)
+        city = await get_city(name=name)
+        
+        # Then geocode the city coordinates - wrap in sync_to_async to safely call in async context
+        geocode_async = sync_to_async(geocode_city_coordinates, thread_sensitive=True)
+        geocode_result = await geocode_async(city.id)
+        
+        # Add geocoding result to our main result
+        result['geocoding'] = geocode_result
+        
+        logger.info(f"Geocoded coordinates for {name}: {geocode_result.get('status', 'unknown')}")
+    except City.DoesNotExist:
+        logger.error(f"City {name} not found in database for geocoding")
+        result['geocoding'] = {'status': 'error', 'message': f"City {name} not found in database"}
+    except Exception as e:
+        logger.error(f"Error geocoding city coordinates: {str(e)}")
+        result['geocoding'] = {'status': 'error', 'message': str(e)}
+    
+    return result
+
+
+def _format_confirmation_message(name: str, result: Dict[str, Any]) -> str:
+    """
+    Format a confirmation message for the user.
+    
+    Args:
+        name: Name of the city
+        result: Result dictionary with import and geocoding data
+        
+    Returns:
+        Formatted message string
+    """
+    geocoding_status = result.get('geocoding', {}).get('status', 'unknown')
+    geocoding_msg = ""
+    
+    if geocoding_status == 'success':
+        coords = result.get('geocoding', {}).get('coordinates', {})
+        lat = coords.get('latitude')
+        lng = coords.get('longitude')
+        geocoding_msg = f" City coordinates set to ({lat}, {lng})."
+    elif geocoding_status == 'error':
+        geocoding_msg = f" Geocoding failed: {result.get('geocoding', {}).get('message', 'unknown error')}."
+    
+    message = (f"City import complete for {name}. "
+              f"Imported {result.get('pois_count', 0)} POIs for the main city and "
+              f"processed {len(result.get('district_pages', []))} districts."
+              f"{geocoding_msg} "
+              f"Please review and confirm to finalize.")
+    
+    return message
+
+
+async def _get_user_confirmation(message: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Pause the flow and get user confirmation.
+    
+    Args:
+        message: Message to display to the user
+        result: Result dictionary to update with confirmation
+        
+    Returns:
+        Updated result dictionary with confirmation information
+    """
+    logger = get_run_logger()
+    logger.info(message)
+    
+    try:
+        # Use the simplest form with a single bool input
+        confirmation = await pause_flow_run(
+            wait_for_input=bool
+        )
+        
+        # Add confirmation to the result
+        result['user_confirmed'] = confirmation
+        logger.info(f"User confirmed: {confirmation}")
+        
+        # If confirmed, return success message
+        if confirmation:
+            logger.info(f"User confirmed the import")
+        else:
+            logger.info(f"User did NOT confirm the import")
+            
+    except Exception as e:
+        logger.error(f"Error during pause/confirmation: {str(e)}")
+        result['user_confirmed'] = False
+        result['confirmation_error'] = str(e)
+    
+    return result
+
+
 @flow(name="import_city", version="1.0")
 async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
     """
@@ -213,40 +345,17 @@ async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
     logger = get_run_logger()
     logger.info(f"Starting import flow for city: {name} (max_depth: {max_depth})")
     
-    # Use sync_to_async to properly bridge Django's sync code with our async flow
-    import_async = sync_to_async(import_wikivoyage_data, thread_sensitive=True)
-    result = await import_async(name, max_depth)
+    # Step 1: Import city data
+    result = await _import_city_data(name, max_depth)
     
-    # Prepare confirmation message
-    message = (f"City import complete for {name}. "
-              f"Imported {result.get('pois_count', 0)} POIs for the main city and "
-              f"processed {len(result.get('district_pages', []))} districts. "
-              f"Please review and confirm to finalize.")
+    # Step 2: Geocode city coordinates
+    result = await _geocode_city(name, result)
     
-    # Log the message for context
-    logger.info(message)
+    # Step 3: Format confirmation message
+    message = _format_confirmation_message(name, result)
     
-    # Pause for user confirmation using the simplest possible form
-    try:
-        # Use the simplest form with a single bool input
-        confirmation = await pause_flow_run(
-            wait_for_input=bool
-        )
-        
-        # Convert result to dict if it's not already
-        if not isinstance(result, dict):
-            result = dict(result)
-            
-        # Add confirmation to the result
-        result['user_confirmed'] = confirmation
-        logger.info(f"User confirmed: {confirmation}")
-            
-    except Exception as e:
-        logger.error(f"Error during pause/confirmation: {str(e)}")
-        if not isinstance(result, dict):
-            result = dict(result)
-        result['user_confirmed'] = False
-        result['confirmation_error'] = str(e)
+    # Step 4: Get user confirmation
+    result = await _get_user_confirmation(message, result)
     
     return result
 
