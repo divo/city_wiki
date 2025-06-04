@@ -19,6 +19,7 @@ dependencies = [
     "geopandas>=1.0.1",
     "pillow>=11.2.1",
     "prefect>=3.4.4",
+    "redis>=6.2.0",
 ]
 
 [tool.uv]
