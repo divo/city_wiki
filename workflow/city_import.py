@@ -18,7 +18,7 @@ from cities.services.city_import import (
     create_or_get_district,
     import_city_data as import_city_data_service
 )
-from cities.enrich_tasks import geocode_city_coordinates
+from cities.enrich_tasks import geocode_city_coordinates, geocode_missing_addresses
 from cities.models import City
 
 logger = logging.getLogger(__name__)
@@ -261,33 +261,59 @@ async def _geocode_city(name: str, result: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def _format_confirmation_message(name: str, result: Dict[str, Any]) -> str:
+async def _geocode_missing_addresses(name: str, result: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Format a confirmation message for the user.
+    Geocode missing addresses for POIs with coordinates.
 
     Args:
         name: Name of the city
-        result: Result dictionary with import and geocoding data
+        result: Result dictionary from import and geocoding
+
+    Returns:
+        Updated result dictionary with address geocoding information
+    """
+    logger = get_run_logger()
+    logger.info(f"Geocoding missing addresses for POIs in {name}")
+
+    try:
+        # Get the city ID
+        get_city = sync_to_async(City.objects.get, thread_sensitive=True)
+        city = await get_city(name=name)
+
+        # Geocode missing addresses
+        geocode_addresses_async = sync_to_async(geocode_missing_addresses, thread_sensitive=True)
+        addresses_result = await geocode_addresses_async(city.id)
+
+        # Add address geocoding result to our main result
+        result['address_geocoding'] = addresses_result
+
+        logger.info(f"Address geocoding for {name}: {addresses_result.get('status', 'unknown')}, "
+                   f"Updated {addresses_result.get('updated_count', 0)} POIs")
+    except City.DoesNotExist:
+        logger.error(f"City {name} not found in database for address geocoding")
+        result['address_geocoding'] = {'status': 'error', 'message': f"City {name} not found in database"}
+    except Exception as e:
+        logger.error(f"Error geocoding addresses: {str(e)}")
+        result['address_geocoding'] = {'status': 'error', 'message': str(e)}
+
+    return result
+
+
+def _format_initial_confirmation_message(name: str, result: Dict[str, Any]) -> str:
+    """
+    Format an initial confirmation message for the user after data import.
+
+    Args:
+        name: Name of the city
+        result: Result dictionary with import data
 
     Returns:
         Formatted message string
     """
-    geocoding_status = result.get('geocoding', {}).get('status', 'unknown')
-    geocoding_msg = ""
-
-    if geocoding_status == 'success':
-        coords = result.get('geocoding', {}).get('coordinates', {})
-        lat = coords.get('latitude')
-        lng = coords.get('longitude')
-        geocoding_msg = f" City coordinates set to ({lat}, {lng})."
-    elif geocoding_status == 'error':
-        geocoding_msg = f" Geocoding failed: {result.get('geocoding', {}).get('message', 'unknown error')}."
-
     message = (f"City import complete for {name}. "
               f"Imported {result.get('pois_count', 0)} POIs for the main city and "
-              f"processed {len(result.get('district_pages', []))} districts."
-              f"{geocoding_msg} "
-              f"Please review and confirm to finalize.")
+              f"processed {len(result.get('district_pages', []))} districts. "
+              f"Do you want to confirm this import and proceed with geocoding coordinates and addresses?")
 
     return message
 
@@ -295,38 +321,38 @@ def _format_confirmation_message(name: str, result: Dict[str, Any]) -> str:
 async def _get_user_confirmation(message: str, result: Dict[str, Any]) -> Dict[str, Any]:
     """
     Pause the flow and get user confirmation.
-
+    
     Args:
         message: Message to display to the user
         result: Result dictionary to update with confirmation
-
+        
     Returns:
         Updated result dictionary with confirmation information
     """
     logger = get_run_logger()
     logger.info(message)
-
+    
     try:
         # Use the simplest form with a single bool input
         confirmation = await pause_flow_run(
             wait_for_input=bool
         )
-
+        
         # Add confirmation to the result
         result['user_confirmed'] = confirmation
         logger.info(f"User confirmed: {confirmation}")
-
+        
         # If confirmed, return success message
         if confirmation:
-            logger.info(f"User confirmed the import")
+            logger.info("User confirmed the import")
         else:
-            logger.info(f"User did NOT confirm the import")
-
+            logger.info("User did NOT confirm the import")
+            
     except Exception as e:
-        logger.error(f"Error during pause/confirmation: {str(e)}")
+        logger.error(f"Error during confirmation: {str(e)}")
         result['user_confirmed'] = False
         result['confirmation_error'] = str(e)
-
+    
     return result
 
 
@@ -348,14 +374,23 @@ async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
     # Step 1: Import city data
     result = await _import_city_data(name, max_depth)
 
-    # Step 2: Format confirmation message
-    message = _format_confirmation_message(name, result)
+    # Step 2: Format initial confirmation message
+    message = _format_initial_confirmation_message(name, result)
 
-    # Step 3: Get user confirmation
+    # Step 3: Get user confirmation before proceeding with geocoding
     result = await _get_user_confirmation(message, result)
-
-    # Step 4: Geocode city coordinates
-    result = await _geocode_city(name, result)
+    
+    # Only proceed with geocoding if user confirmed
+    if result.get('user_confirmed', False):
+        logger.info(f"User confirmed import for {name}, proceeding with geocoding")
+        
+        # Step 4: Geocode city coordinates
+        result = await _geocode_city(name, result)
+        
+        # Step 5: Geocode missing addresses for POIs
+        result = await _geocode_missing_addresses(name, result)
+    else:
+        logger.info(f"User did not confirm import for {name}, skipping geocoding steps")
 
     return result
 
