@@ -740,4 +740,175 @@ def find_duplicate_keys(city_id):
         logger.error(f"Error in find_duplicate_keys task: {str(e)}")
         raise
 
+@shared_task
+def auto_merge_duplicates(city_id, duplicates_data=None):
+    """
+    Automatically merge general duplicate POIs using best-value logic.
+    Uses provided duplicates data or calls find_all_duplicates if not provided.
+    """
+    try:
+        city = City.objects.get(id=city_id)
+        logger.info(f"Starting automatic merge of duplicates for {city.name}")
+
+        # Use provided duplicates data or find them if not provided
+        if duplicates_data and duplicates_data.get('status') == 'success':
+            duplicates = duplicates_data.get('duplicates', [])
+            logger.info(f"Using provided duplicate pairs data")
+        else:
+            logger.info(f"No duplicate pairs provided, finding them now")
+            duplicates_result = find_all_duplicates(city_id)
+            
+            if duplicates_result.get('status') != 'success':
+                logger.error(f"Failed to find duplicates: {duplicates_result}")
+                return duplicates_result
+
+            duplicates = duplicates_result.get('duplicates', [])
+
+        total_pairs = len(duplicates)
+        merged_count = 0
+        errors = []
+
+        logger.info(f"Found {total_pairs} duplicate pairs to process")
+
+        for i, duplicate_pair in enumerate(duplicates, 1):
+            try:
+                poi1_id = duplicate_pair['poi1_id']
+                poi2_id = duplicate_pair['poi2_id']
+                
+                logger.info(f"Processing pair {i}/{total_pairs}: {duplicate_pair['poi1_name']} ↔ {duplicate_pair['poi2_name']}")
+
+                # Get full POI data
+                poi1 = PointOfInterest.objects.get(id=poi1_id)
+                poi2 = PointOfInterest.objects.get(id=poi2_id)
+
+                # Determine which POI to keep and which to remove using best-value logic
+                keep_poi, remove_poi, field_selections = _determine_best_merge(poi1, poi2)
+
+                # Prepare merge data
+                merge_data = {
+                    'keep_id': keep_poi.id,
+                    'remove_id': remove_poi.id,
+                    'field_selections': field_selections
+                }
+
+                # Make request to poi_merge endpoint
+                response = requests.post(
+                    f'http://localhost:8000/city/{city.name}/poi/merge/',
+                    json=merge_data,
+                    headers={'Content-Type': 'application/json'}
+                )
+
+                if response.status_code == 200:
+                    merged_count += 1
+                    logger.info(f"✅ Successfully merged {remove_poi.name} into {keep_poi.name}")
+                else:
+                    error_msg = f"❌ Merge failed for POIs {poi1_id}/{poi2_id}: {response.text}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+
+            except PointOfInterest.DoesNotExist as e:
+                error_msg = f"❌ POI not found for pair {poi1_id}/{poi2_id}: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+            except Exception as e:
+                error_msg = f"❌ Error processing pair {poi1_id}/{poi2_id}: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+
+        logger.info(f"Auto-merge complete for {city.name}: merged {merged_count}/{total_pairs} pairs")
+
+        return {
+            'status': 'success',
+            'message': f'Processed {total_pairs} duplicate pairs, successfully merged {merged_count}',
+            'total_pairs': total_pairs,
+            'merged_count': merged_count,
+            'errors': errors
+        }
+
+    except Exception as e:
+        logger.error(f"Error in auto_merge_duplicates task: {str(e)}")
+        raise
+
+
+def _determine_best_merge(poi1, poi2):
+    """
+    Determine which POI to keep and which to remove, plus field selections for the merge.
+    Logic: Choose best values (non-null over null, longer text over shorter, higher rank).
+    
+    Returns:
+        tuple: (keep_poi, remove_poi, field_selections)
+    """
+    
+    # Start with poi1 as default keeper
+    keep_poi = poi1
+    remove_poi = poi2
+    field_selections = {}
+
+    # Helper function to choose better value
+    def choose_better_value(val1, val2, field_name):
+        # Non-null wins over null
+        if val1 and not val2:
+            return val1
+        if val2 and not val1:
+            return val2
+        
+        # If both are null or both are non-null
+        if not val1 and not val2:
+            return val1  # Both null, doesn't matter
+            
+        # Both have values - apply field-specific logic
+        if field_name == 'rank':
+            # Lower rank (number) is better
+            return min(val1, val2) if val1 is not None and val2 is not None else (val1 or val2)
+        elif field_name in ['description', 'address', 'hours']:
+            # Longer text is usually better
+            str1 = str(val1 or '')
+            str2 = str(val2 or '')
+            return val1 if len(str1) >= len(str2) else val2
+        else:
+            # For other fields, prefer poi1's value (arbitrary but consistent)
+            return val1
+
+    # Determine best values for each field
+    fields_to_compare = [
+        'name', 'category', 'sub_category', 'description', 
+        'latitude', 'longitude', 'address', 'phone', 
+        'website', 'hours', 'rank'
+    ]
+
+    for field in fields_to_compare:
+        val1 = getattr(poi1, field, None)
+        val2 = getattr(poi2, field, None)
+        
+        best_val = choose_better_value(val1, val2, field)
+        
+        # If the best value comes from the remove_poi, we need to update field_selections
+        if best_val == val2:
+            field_selections[field] = best_val
+
+    # Handle district separately (it's a ForeignKey)
+    district1 = poi1.district
+    district2 = poi2.district
+    
+    # Prefer non-null district, or keep poi1's district
+    if district2 and not district1:
+        field_selections['district'] = district2.name
+    elif district1 and district2 and district1 != district2:
+        # Both have districts - this is a judgment call, keep poi1's
+        pass
+    
+    # Handle coordinates as a pair
+    if poi1.latitude and poi1.longitude and (not poi2.latitude or not poi2.longitude):
+        # poi1 has complete coordinates, poi2 doesn't
+        pass
+    elif poi2.latitude and poi2.longitude and (not poi1.latitude or not poi1.longitude):
+        # poi2 has complete coordinates, poi1 doesn't
+        field_selections['coordinates'] = f"{poi2.latitude},{poi2.longitude}"
+
+    logger.info(f"Merge decision: keeping POI {keep_poi.id} ({keep_poi.name}), removing POI {remove_poi.id} ({remove_poi.name})")
+    logger.info(f"Field selections: {field_selections}")
+
+    return keep_poi, remove_poi, field_selections
+
+
 # Data transformation tasks will be added here

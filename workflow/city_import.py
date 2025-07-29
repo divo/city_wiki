@@ -22,7 +22,8 @@ from cities.enrich_tasks import (
     geocode_city_coordinates, 
     geocode_missing_addresses, 
     geocode_missing_coordinates,
-    find_all_duplicates
+    find_all_duplicates,
+    auto_merge_duplicates
 )
 from cities.models import City
 
@@ -380,6 +381,53 @@ async def _find_duplicates(name: str, result: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
+async def _auto_merge_duplicates(name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Automatically merge duplicate POIs using best-value logic.
+    Uses the duplicates data from the previous step to avoid redundant work.
+
+    Args:
+        name: Name of the city
+        result: Result dictionary from import and geocoding (should contain 'duplicates' key)
+
+    Returns:
+        Updated result dictionary with auto-merge information
+    """
+    logger = get_run_logger()
+    logger.info(f"Auto-merging duplicate POIs in {name}")
+
+    try:
+        # Get the city ID
+        get_city = sync_to_async(City.objects.get, thread_sensitive=True)
+        city = await get_city(name=name)
+
+        # Get duplicates data from previous step
+        duplicates_data = result.get('duplicates')
+        
+        if not duplicates_data or duplicates_data.get('status') != 'success':
+            logger.warning(f"No valid duplicates data found for {name}, skipping auto-merge")
+            result['auto_merge'] = {'status': 'skipped', 'message': 'No valid duplicates data available'}
+            return result
+
+        # Auto-merge duplicates using the existing data
+        auto_merge_async = sync_to_async(auto_merge_duplicates, thread_sensitive=True)
+        merge_result = await auto_merge_async(city.id, duplicates_data)
+
+        # Add merge result to our main result
+        result['auto_merge'] = merge_result
+
+        logger.info(f"Auto-merge for {name}: {merge_result.get('status', 'unknown')}, "
+                   f"Merged {merge_result.get('merged_count', 0)}/{merge_result.get('total_pairs', 0)} pairs")
+    except City.DoesNotExist:
+        logger.error(f"City {name} not found in database for auto-merge")
+        result['auto_merge'] = {'status': 'error', 'message': f"City {name} not found in database"}
+    except Exception as e:
+        logger.error(f"Error auto-merging duplicates: {str(e)}")
+        result['auto_merge'] = {'status': 'error', 'message': str(e)}
+
+    return result
+
+
 def _format_initial_confirmation_message(name: str, result: Dict[str, Any]) -> str:
     """
     Format an initial confirmation message for the user after data import.
@@ -448,11 +496,20 @@ def _format_geocoding_confirmation_message(name: str, result: Dict[str, Any]) ->
                                   f"(Reason: {dup.get('reason', 'Unknown')}, "
                                   f"IDs: {dup.get('poi1_id', 'Unknown')}/{dup.get('poi2_id', 'Unknown')})\n")
 
-    message = (f"Geocoding complete for {name}.\n\n"
+    # Auto-merge info
+    merge_msg = ""
+    if result.get('auto_merge', {}).get('status') == 'success':
+        merged = result.get('auto_merge', {}).get('merged_count', 0)
+        total = result.get('auto_merge', {}).get('total_pairs', 0)
+        errors = len(result.get('auto_merge', {}).get('errors', []))
+        merge_msg = f"Auto-merged {merged} out of {total} duplicate pairs ({errors} errors)."
+
+    message = (f"Geocoding and deduplication complete for {name}.\n\n"
               f"{city_msg}\n"
               f"{address_msg}\n"
               f"{coord_msg}\n"
               f"{dup_msg}{duplicate_list}\n"
+              f"{merge_msg}\n"
               f"Would you like to continue with the import process?")
 
     return message
@@ -537,10 +594,13 @@ async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
         # Step 7: Find duplicate POIs
         result = await _find_duplicates(name, result)
         
-        # Step 8: Format geocoding confirmation message
+        # Step 8: Auto-merge duplicate POIs
+        result = await _auto_merge_duplicates(name, result)
+        
+        # Step 9: Format geocoding confirmation message
         message = _format_geocoding_confirmation_message(name, result)
         
-        # Step 9: Get final user confirmation
+        # Step 10: Get final user confirmation
         result = await _get_user_confirmation(message, result, step="geocoding")
     else:
         logger.info(f"User did not confirm import for {name}, skipping geocoding steps")
