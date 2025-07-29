@@ -18,7 +18,12 @@ from cities.services.city_import import (
     create_or_get_district,
     import_city_data as import_city_data_service
 )
-from cities.enrich_tasks import geocode_city_coordinates, geocode_missing_addresses, geocode_missing_coordinates
+from cities.enrich_tasks import (
+    geocode_city_coordinates, 
+    geocode_missing_addresses, 
+    geocode_missing_coordinates,
+    find_all_duplicates
+)
 from cities.models import City
 
 logger = logging.getLogger(__name__)
@@ -337,6 +342,44 @@ async def _geocode_missing_coordinates(name: str, result: Dict[str, Any]) -> Dic
     return result
 
 
+async def _find_duplicates(name: str, result: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Find potential duplicate POIs in the city.
+
+    Args:
+        name: Name of the city
+        result: Result dictionary from import and geocoding
+
+    Returns:
+        Updated result dictionary with duplicate detection information
+    """
+    logger = get_run_logger()
+    logger.info(f"Detecting duplicate POIs in {name}")
+
+    try:
+        # Get the city ID
+        get_city = sync_to_async(City.objects.get, thread_sensitive=True)
+        city = await get_city(name=name)
+
+        # Find duplicates
+        find_duplicates_async = sync_to_async(find_all_duplicates, thread_sensitive=True)
+        duplicates_result = await find_duplicates_async(city.id)
+
+        # Add duplicates result to our main result
+        result['duplicates'] = duplicates_result
+
+        logger.info(f"Duplicate detection for {name}: {duplicates_result.get('status', 'unknown')}, "
+                   f"Found {len(duplicates_result.get('duplicates', []))} potential duplicate pairs")
+    except City.DoesNotExist:
+        logger.error(f"City {name} not found in database for duplicate detection")
+        result['duplicates'] = {'status': 'error', 'message': f"City {name} not found in database"}
+    except Exception as e:
+        logger.error(f"Error finding duplicates: {str(e)}")
+        result['duplicates'] = {'status': 'error', 'message': str(e)}
+
+    return result
+
+
 def _format_initial_confirmation_message(name: str, result: Dict[str, Any]) -> str:
     """
     Format an initial confirmation message for the user after data import.
@@ -351,18 +394,78 @@ def _format_initial_confirmation_message(name: str, result: Dict[str, Any]) -> s
     message = (f"City import complete for {name}. "
               f"Imported {result.get('pois_count', 0)} POIs for the main city and "
               f"processed {len(result.get('district_pages', []))} districts. "
-              f"Do you want to confirm this import and proceed with geocoding coordinates and addresses?")
+              f"Would you like to proceed with geocoding coordinates and addresses?")
 
     return message
 
 
-async def _get_user_confirmation(message: str, result: Dict[str, Any]) -> Dict[str, Any]:
+def _format_geocoding_confirmation_message(name: str, result: Dict[str, Any]) -> str:
+    """
+    Format a confirmation message after geocoding operations.
+
+    Args:
+        name: Name of the city
+        result: Result dictionary with geocoding results
+
+    Returns:
+        Formatted message string
+    """
+    # City geocoding info
+    city_msg = ""
+    if result.get('geocoding', {}).get('status') == 'success':
+        coords = result.get('geocoding', {}).get('coordinates', {})
+        lat = coords.get('latitude')
+        lng = coords.get('longitude')
+        city_msg = f"City coordinates set to ({lat}, {lng})."
+
+    # Address geocoding info
+    address_msg = ""
+    if result.get('address_geocoding', {}).get('status') == 'success':
+        updated = result.get('address_geocoding', {}).get('updated_count', 0)
+        processed = result.get('address_geocoding', {}).get('processed_count', 0)
+        address_msg = f"Updated addresses for {updated} out of {processed} POIs."
+
+    # Coordinate geocoding info
+    coord_msg = ""
+    if result.get('coordinate_geocoding', {}).get('status') == 'success':
+        updated = result.get('coordinate_geocoding', {}).get('updated_count', 0)
+        processed = result.get('coordinate_geocoding', {}).get('processed_count', 0)
+        coord_msg = f"Updated coordinates for {updated} out of {processed} POIs."
+
+    # Duplicate detection info
+    dup_msg = ""
+    duplicate_list = ""
+    if result.get('duplicates', {}).get('status') == 'success':
+        duplicates = result.get('duplicates', {}).get('duplicates', [])
+        dups = len(duplicates)
+        dup_msg = f"Found {dups} potential duplicate pairs that may need review."
+        
+        # Add detailed list of duplicates if any were found
+        if dups > 0:
+            duplicate_list = "\n\nDetailed duplicate pairs:\n"
+            for i, dup in enumerate(duplicates, 1):
+                duplicate_list += (f"{i}. {dup.get('poi1_name', 'Unknown')} ↔ {dup.get('poi2_name', 'Unknown')} "
+                                  f"(Reason: {dup.get('reason', 'Unknown')}, "
+                                  f"IDs: {dup.get('poi1_id', 'Unknown')}/{dup.get('poi2_id', 'Unknown')})\n")
+
+    message = (f"Geocoding complete for {name}.\n\n"
+              f"{city_msg}\n"
+              f"{address_msg}\n"
+              f"{coord_msg}\n"
+              f"{dup_msg}{duplicate_list}\n"
+              f"Would you like to continue with the import process?")
+
+    return message
+
+
+async def _get_user_confirmation(message: str, result: Dict[str, Any], step: str = "import") -> Dict[str, Any]:
     """
     Pause the flow and get user confirmation.
     
     Args:
         message: Message to display to the user
         result: Result dictionary to update with confirmation
+        step: The current step requiring confirmation
         
     Returns:
         Updated result dictionary with confirmation information
@@ -376,20 +479,20 @@ async def _get_user_confirmation(message: str, result: Dict[str, Any]) -> Dict[s
             wait_for_input=bool
         )
         
-        # Add confirmation to the result
-        result['user_confirmed'] = confirmation
-        logger.info(f"User confirmed: {confirmation}")
+        # Add confirmation to the result with the specific step
+        result[f'{step}_confirmed'] = confirmation
+        logger.info(f"User confirmation for {step}: {confirmation}")
         
         # If confirmed, return success message
         if confirmation:
-            logger.info("User confirmed the import")
+            logger.info(f"User confirmed the {step}")
         else:
-            logger.info("User did NOT confirm the import")
+            logger.info(f"User did NOT confirm the {step}")
             
     except Exception as e:
-        logger.error(f"Error during confirmation: {str(e)}")
-        result['user_confirmed'] = False
-        result['confirmation_error'] = str(e)
+        logger.error(f"Error during {step} confirmation: {str(e)}")
+        result[f'{step}_confirmed'] = False
+        result[f'{step}_confirmation_error'] = str(e)
     
     return result
 
@@ -398,11 +501,11 @@ async def _get_user_confirmation(message: str, result: Dict[str, Any]) -> Dict[s
 async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
     """
     Import a city and its districts from Wikivoyage.
-
+    
     Args:
         name: Name of the city to import
         max_depth: Maximum depth to recurse for districts
-
+        
     Returns:
         Dictionary with status information
     """
@@ -416,10 +519,10 @@ async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
     message = _format_initial_confirmation_message(name, result)
 
     # Step 3: Get user confirmation before proceeding with geocoding
-    result = await _get_user_confirmation(message, result)
+    result = await _get_user_confirmation(message, result, step="import")
     
     # Only proceed with geocoding if user confirmed
-    if result.get('user_confirmed', False):
+    if result.get('import_confirmed', False):
         logger.info(f"User confirmed import for {name}, proceeding with geocoding")
         
         # Step 4: Geocode city coordinates
@@ -430,6 +533,15 @@ async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
         
         # Step 6: Geocode missing coordinates for POIs
         result = await _geocode_missing_coordinates(name, result)
+        
+        # Step 7: Find duplicate POIs
+        result = await _find_duplicates(name, result)
+        
+        # Step 8: Format geocoding confirmation message
+        message = _format_geocoding_confirmation_message(name, result)
+        
+        # Step 9: Get final user confirmation
+        result = await _get_user_confirmation(message, result, step="geocoding")
     else:
         logger.info(f"User did not confirm import for {name}, skipping geocoding steps")
 
