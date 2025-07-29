@@ -1,0 +1,5 @@
+# Custom Prefect configuration for city_wiki project
+name: city_wiki_workflows
+prefect-version: 2.10.0
+
+# Build section
