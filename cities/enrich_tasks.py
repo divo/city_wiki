@@ -541,6 +541,74 @@ def fetch_osm_ids(city_id):
         logger.error(f"Error in fetch_osm_ids task: {str(e)}")
         raise
 
+def find_closest_osm_poi(poi_lat, poi_lon, osm_pois, osm_projected, radius_meters=5):
+    """
+    Find the closest OSM POI within the given radius using proper geographic distance calculation.
+
+    Args:
+        poi_lat: Latitude of target POI
+        poi_lon: Longitude of target POI
+        osm_pois: GeoDataFrame of OSM POIs in EPSG:4326 (for tag extraction)
+        osm_projected: GeoDataFrame of OSM POIs in EPSG:3857 (for distance calculation)
+        radius_meters: Search radius in meters (default: 5)
+
+    Returns:
+        tuple: (osm_id_string, distance_meters, tags_dict) or (None, None, None) if no match
+    """
+    from shapely.geometry import Point
+    import geopandas as gpd
+    import pandas as pd
+
+    try:
+        # Create target point in WGS84 and project to Web Mercator
+        target_point = Point(poi_lon, poi_lat)
+        target_gdf = gpd.GeoDataFrame({"geometry": [target_point]}, crs="EPSG:4326")
+        target_projected = target_gdf.to_crs("EPSG:3857")
+
+        # Calculate distances in meters using pre-projected data
+        distances = osm_projected.geometry.distance(target_projected.iloc[0].geometry)
+
+        # Filter by radius
+        within_radius_mask = distances <= radius_meters
+        nearby_indices = distances[within_radius_mask].index
+
+        if len(nearby_indices) == 0:
+            return None, None, None
+
+        # Get nearby POIs from original (unprojected) data for tag extraction
+        nearby = osm_pois.iloc[nearby_indices].copy()
+        nearby['distance_meters'] = distances.iloc[nearby_indices]
+
+        # Sort by distance and get the closest
+        nearby = nearby.sort_values('distance_meters')
+        closest = nearby.iloc[0]
+
+        # Get OSM ID and type
+        osm_id = str(closest['id'])
+        # Check if 'osm_type' exists in the data, otherwise use 'type' or default to 'node'
+        if 'osm_type' in closest:
+            osm_type = closest['osm_type']
+        elif 'type' in closest:
+            osm_type = closest['type']
+        else:
+            osm_type = 'node'
+
+        osm_id_string = f"{osm_type}/{osm_id}"
+
+        # Extract tags for logging (exclude technical columns)
+        exclude_cols = {'geometry', 'id', 'distance_meters', 'type', 'osm_type', 'version', 'timestamp', 'visible'}
+        tags = {col: closest[col] for col in closest.index
+                if pd.notna(closest[col]) and col not in exclude_cols}
+
+        return osm_id_string, closest['distance_meters'], tags
+
+    except Exception as e:
+        logger.error(f"Error in find_closest_osm_poi: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return None, None, None
+
+
 @shared_task
 def find_osm_ids_local(city_id, pbf_file=None):
     """
@@ -560,9 +628,6 @@ def find_osm_ids_local(city_id, pbf_file=None):
             raise ValueError(f"PBF file not found at path: {pbf_file}")
 
         from pyrosm import OSM
-        from shapely.geometry import Point
-        import geopandas as gpd
-        import pandas as pd
 
         city = City.objects.get(id=city_id)
         logger.info(f"Starting local OSM ID lookup for {city.name} using PBF file: {pbf_file}")
@@ -596,67 +661,40 @@ def find_osm_ids_local(city_id, pbf_file=None):
         # Ensure OSM POIs are in WGS 84
         osm_pois = osm_pois.to_crs("EPSG:4326")
 
+        # Pre-project OSM data to Web Mercator for efficient distance calculations
+        logger.info("Projecting OSM data to Web Mercator for distance calculations...")
+        osm_projected = osm_pois.to_crs("EPSG:3857")
+
         # Process each POI
         processed_count = 0
         updated_count = 0
         radius = 5  # 5 meters
-        radius_degrees = radius / 111139.0  # Convert meters to degrees
+
+        logger.info(f"Found {len(pois)} POIs to process in {city.name}")
 
         for poi in pois:
-            logger.info(
-                f"\nProcessing POI {processed_count + 1}/{total_pois}:\n"
-                f"  Name: {poi.name}\n"
-                f"  Category: {poi.category}\n"
-                f"  Location: ({poi.latitude}, {poi.longitude})"
-            )
 
             try:
-                # Create a GeoDataFrame for the target point
-                target_point = gpd.GeoDataFrame(
-                    {"geometry": [Point(poi.longitude, poi.latitude)]},
-                    crs="EPSG:4326"
+                # Use the extracted method to find closest OSM POI
+                osm_id_string, distance_meters, tags = find_closest_osm_poi(
+                    poi.latitude, poi.longitude, osm_pois, osm_projected, radius
                 )
 
-                # Calculate distances and filter nearby POIs
-                distances = osm_pois.geometry.distance(target_point.iloc[0].geometry)
-                nearby = osm_pois[distances <= radius_degrees].copy()
-                nearby['distance'] = distances[distances <= radius_degrees] * 111139.0  # Convert back to meters
-
-                if not nearby.empty:
-                    # Sort by distance and get the closest
-                    nearby = nearby.sort_values('distance')
-                    closest = nearby.iloc[0]
-
-                    # Get OSM ID and type
-                    osm_id = str(closest['id'])
-                    osm_type = closest['type'] if 'type' in closest else 'node'
-
+                if osm_id_string:
                     # Update the POI
-                    poi.osm_id = f"{osm_type}/{osm_id}"
+                    poi.osm_id = osm_id_string
                     poi.save()
                     updated_count += 1
-
-                    # Log the match with details
-                    tags = {col: closest[col] for col in closest.index if pd.notna(closest[col]) and col not in ['geometry', 'id', 'distance']}
-                    logger.info(
-                        f"✅ Found match for {poi.name}:\n"
-                        f"  OSM: {poi.osm_id}\n"
-                        f"  Distance: {closest['distance']:.2f}m\n"
-                        f"  Tags: {tags}"
-                    )
                 else:
-                    logger.warning(f"❌ No matches found for {poi.name}")
+                    # Only log if no matches found and we're in debug mode
+                    pass
 
             except Exception as e:
                 logger.error(f"Error processing POI {poi.name}: {str(e)}")
 
             processed_count += 1
-            if processed_count % 10 == 0:
-                logger.info(
-                    f"\nProgress update:\n"
-                    f"- Processed: {processed_count}/{total_pois} POIs\n"
-                    f"- Matches found: {updated_count}"
-                )
+            if processed_count % 100 == 0:
+                logger.info(f"Progress: {processed_count}/{total_pois} POIs processed, {updated_count} matches found")
 
         logger.info(f"\nTask complete for {city.name}:")
         logger.info(f"- Total POIs processed: {processed_count}")
@@ -757,7 +795,7 @@ def auto_merge_duplicates(city_id, duplicates_data=None):
         else:
             logger.info(f"No duplicate pairs provided, finding them now")
             duplicates_result = find_all_duplicates(city_id)
-            
+
             if duplicates_result.get('status') != 'success':
                 logger.error(f"Failed to find duplicates: {duplicates_result}")
                 return duplicates_result
@@ -774,7 +812,7 @@ def auto_merge_duplicates(city_id, duplicates_data=None):
             try:
                 poi1_id = duplicate_pair['poi1_id']
                 poi2_id = duplicate_pair['poi2_id']
-                
+
                 logger.info(f"Processing pair {i}/{total_pairs}: {duplicate_pair['poi1_name']} ↔ {duplicate_pair['poi2_name']}")
 
                 # Get full POI data
@@ -834,11 +872,11 @@ def _determine_best_merge(poi1, poi2):
     """
     Determine which POI to keep and which to remove, plus field selections for the merge.
     Logic: Choose best values (non-null over null, longer text over shorter, higher rank).
-    
+
     Returns:
         tuple: (keep_poi, remove_poi, field_selections)
     """
-    
+
     # Start with poi1 as default keeper
     keep_poi = poi1
     remove_poi = poi2
@@ -851,11 +889,11 @@ def _determine_best_merge(poi1, poi2):
             return val1
         if val2 and not val1:
             return val2
-        
+
         # If both are null or both are non-null
         if not val1 and not val2:
             return val1  # Both null, doesn't matter
-            
+
         # Both have values - apply field-specific logic
         if field_name == 'rank':
             # Lower rank (number) is better
@@ -871,17 +909,17 @@ def _determine_best_merge(poi1, poi2):
 
     # Determine best values for each field
     fields_to_compare = [
-        'name', 'category', 'sub_category', 'description', 
-        'latitude', 'longitude', 'address', 'phone', 
+        'name', 'category', 'sub_category', 'description',
+        'latitude', 'longitude', 'address', 'phone',
         'website', 'hours', 'rank'
     ]
 
     for field in fields_to_compare:
         val1 = getattr(poi1, field, None)
         val2 = getattr(poi2, field, None)
-        
+
         best_val = choose_better_value(val1, val2, field)
-        
+
         # If the best value comes from the remove_poi, we need to update field_selections
         if best_val == val2:
             field_selections[field] = best_val
@@ -889,14 +927,14 @@ def _determine_best_merge(poi1, poi2):
     # Handle district separately (it's a ForeignKey)
     district1 = poi1.district
     district2 = poi2.district
-    
+
     # Prefer non-null district, or keep poi1's district
     if district2 and not district1:
         field_selections['district'] = district2.name
     elif district1 and district2 and district1 != district2:
         # Both have districts - this is a judgment call, keep poi1's
         pass
-    
+
     # Handle coordinates as a pair
     if poi1.latitude and poi1.longitude and (not poi2.latitude or not poi2.longitude):
         # poi1 has complete coordinates, poi2 doesn't
