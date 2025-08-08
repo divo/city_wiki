@@ -20,6 +20,7 @@ dependencies = [
     "pillow>=11.2.1",
     "prefect>=3.4.4",
     "redis>=6.2.0",
+    "pyrosm>=0.6.2",
 ]
 
 [tool.uv]
