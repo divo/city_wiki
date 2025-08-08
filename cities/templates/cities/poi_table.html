@@ -4,7 +4,7 @@
             margin: 0 -15px;  /* Negative margin to break out of container padding */
             width: calc(100% + 30px);  /* Compensate for negative margin */
         }
-        
+
         .poi-table {
             width: 100%;
             min-width: 1400px;  /* Ensure table has a good minimum width */
@@ -42,21 +42,21 @@
         .poi-table td:nth-child(12) { width: 7%; }  /* OSM ID */
         .poi-table td:nth-child(13) { width: 7%; }  /* Created at */
         .poi-table td:nth-child(14) { width: 3%; }  /* Actions */
-        
+
         .btn-sm {
             padding: 0.25rem 0.5rem;
             font-size: 0.875rem;
             line-height: 1.5;
             border-radius: 0.2rem;
         }
-        
+
         .btn-info {
             color: #fff;
             background-color: #17a2b8;
             border-color: #17a2b8;
             text-decoration: none;
         }
-        
+
         .btn-info:hover {
             color: #fff;
             background-color: #138496;
@@ -396,7 +396,7 @@
         <span id="selectedCount">0 POIs selected</span>
         <button onclick="handleMergeSelected()" class="btn btn-primary">Merge Selected</button>
         <button onclick="handleDeleteSelected()" class="btn btn-danger">Delete Selected (Untested)</button>
-        
+
         <div class="list-creation" style="display: inline-block; margin-left: 1em;">
             <input type="text" id="listTitle" placeholder="Enter list title" class="form-control" style="display: inline-block; width: auto;">
             <button onclick="createList()" class="btn btn-success">Create List</button>
@@ -495,30 +495,30 @@
                             <div class="description-cell {% if poi.has_revisions %}has-revisions{% else %}no-revisions{% endif %}">
                                 <textarea class="reworded">{{ poi.description|default:"" }}</textarea>
                                 <div class="button-group">
-                                    <button 
-                                        class="reword-btn" 
+                                    <button
+                                        class="reword-btn"
                                         data-poi-name="{{ poi.name }}"
                                         onclick="rewordDescription({{ poi.id }}, this.dataset.poiName, this)"
                                     >
                                         {% if poi.description %}Reword Description{% else %}Create Description{% endif %}
                                     </button>
-                                    <button 
-                                        class="wiki-btn" 
+                                    <button
+                                        class="wiki-btn"
                                         data-poi-name="{{ poi.name }}"
                                         onclick="getWikipediaDescription(this.dataset.poiName, this)"
                                     >Get Wikipedia</button>
-                                    <button 
-                                        class="generate-wiki-btn" 
+                                    <button
+                                        class="generate-wiki-btn"
                                         data-poi-name="{{ poi.name }}"
                                         onclick="generateFromWiki({{ poi.id }}, this.dataset.poiName, this)"
                                     >Generate from Wiki</button>
-                                    <button 
-                                        class="generate-wiki-name-btn" 
+                                    <button
+                                        class="generate-wiki-name-btn"
                                         data-poi-name="{{ poi.name }}"
                                         onclick="getWikipediaDescriptionByName({{ poi.id }}, this.dataset.poiName, this)"
                                     >Get from Wikipedia by Name</button>
-                                    <button 
-                                        class="save-btn" 
+                                    <button
+                                        class="save-btn"
                                         onclick="saveDescription({{ poi.id }}, this)"
                                     >Save Description</button>
                                 </div>
@@ -544,7 +544,9 @@
                             {% endif %}
                         </td>
                         <td {% if not poi.osm_id %}class="empty-cell"{% endif %}>
-                            {{ poi.osm_id|default:"" }}
+                            <a href="https://www.openstreetmap.org/{{ poi.osm_id|default:"" }}">
+                                {{ poi.osm_id|default:"" }}
+                            </a>
                         </td>
                         <td {% if not poi.created_at %}class="empty-cell"{% endif %}>{{ poi.created_at|default:"" }}</td>
                         <td>
@@ -573,7 +575,7 @@
                 <form id="editForm" method="POST">
                     {% csrf_token %}
                     <input type="hidden" id="poiId" name="poi_id">
-                    
+
                     <div class="form-group">
                         <label for="name">Name:</label>
                         <input type="text" id="name" name="name" class="form-control">
@@ -699,17 +701,17 @@
         function fuzzyMatch(pattern, str) {
             pattern = pattern.toLowerCase();
             str = str.toLowerCase();
-            
+
             let patternIdx = 0;
             let strIdx = 0;
-            
+
             while (patternIdx < pattern.length && strIdx < str.length) {
                 if (pattern[patternIdx] === str[strIdx]) {
                     patternIdx++;
                 }
                 strIdx++;
             }
-            
+
             return patternIdx === pattern.length;
         }
 
@@ -727,7 +729,7 @@
             document.getElementById('hours').value = hours;
             document.getElementById('rank').value = rank;
             document.getElementById('editDistrict').value = districtId || '';
-            
+
             document.getElementById('editModal').style.display = 'block';
         }
 
@@ -751,7 +753,7 @@
             e.preventDefault();
             const formData = new FormData(this);
             const poiId = formData.get('poi_id');
-            
+
             fetch(`/city/{{ city.name }}/poi/${poiId}/edit/`, {
                 method: 'POST',
                 body: formData,
@@ -777,7 +779,7 @@
         function handleRowSelection(checkbox) {
             const row = checkbox.closest('tr');
             const poiId = row.dataset.poiId;
-            
+
             if (checkbox.checked) {
                 selectedRows.add(poiId);
                 row.classList.add('selected');
@@ -785,19 +787,19 @@
                 selectedRows.delete(poiId);
                 row.classList.remove('selected');
             }
-            
+
             updateSelectionUI();
         }
 
         function toggleAllRows(checkbox) {
             const allCheckboxes = document.querySelectorAll('.select-checkbox');
             const allRows = document.querySelectorAll('.poi-table tbody tr');
-            
+
             allCheckboxes.forEach((cb, index) => {
                 cb.checked = checkbox.checked;
                 const row = allRows[index];
                 const poiId = row.dataset.poiId;
-                
+
                 if (checkbox.checked) {
                     selectedRows.add(poiId);
                     row.classList.add('selected');
@@ -806,21 +808,21 @@
                     row.classList.remove('selected');
                 }
             });
-            
+
             updateSelectionUI();
         }
 
         function updateSelectionUI() {
             const selectionActions = document.getElementById('selectionActions');
             const selectedCount = document.getElementById('selectedCount');
-            
+
             if (selectedRows.size > 0) {
                 selectionActions.style.display = 'block';
                 selectedCount.textContent = `${selectedRows.size} POIs selected`;
             } else {
                 selectionActions.style.display = 'none';
             }
-            
+
             // Update select-all checkbox state
             const selectAllCheckbox = document.querySelector('.select-all-checkbox');
             const allCheckboxes = document.querySelectorAll('.select-checkbox');
@@ -924,11 +926,11 @@
         function toggleField(field, fromPoi1) {
             if (CONCAT_FIELDS.has(field)) {
                 // For special fields, concatenate values when clicking
-                const value1 = field === 'district' ? 
-                    (mergeState.poi1.district || 'Main City') : 
+                const value1 = field === 'district' ?
+                    (mergeState.poi1.district || 'Main City') :
                     (mergeState.poi1[field] || '');
-                const value2 = field === 'district' ? 
-                    (mergeState.poi2.district || 'Main City') : 
+                const value2 = field === 'district' ?
+                    (mergeState.poi2.district || 'Main City') :
                     (mergeState.poi2[field] || '');
 
                 // If already concatenated, revert to single value
@@ -940,8 +942,8 @@
                     };
                 } else {
                     // Concatenate values, putting the selected record's value first
-                    const combinedValue = fromPoi1 ? 
-                        `${value1}${value2 ? ', ' + value2 : ''}` : 
+                    const combinedValue = fromPoi1 ?
+                        `${value1}${value2 ? ', ' + value2 : ''}` :
                         `${value2}${value1 ? ', ' + value1 : ''}`;
                     mergeState.fieldSelections[field] = {
                         fromPoi1: fromPoi1,
@@ -961,15 +963,15 @@
         function updateFieldSelections() {
             const rows = document.getElementById('mergeTableBody').getElementsByTagName('tr');
             const fields = ['name', 'category', 'sub_category', 'district', 'description', 'coordinates', 'address', 'phone', 'hours', 'website', 'rank'];
-            
+
             fields.forEach((field, index) => {
                 const cell1 = rows[0].cells[index + 1];  // +1 for keep record column
                 const cell2 = rows[1].cells[index + 1];
-                
+
                 // Check if we have a specific selection for this field
                 const fieldSelection = mergeState.fieldSelections[field];
                 const useField1 = fieldSelection ? fieldSelection.fromPoi1 : mergeState.keepPoi1;
-                
+
                 cell1.classList.toggle('selected', useField1);
                 cell2.classList.toggle('selected', !useField1);
 
@@ -1026,17 +1028,17 @@
         async function createList() {
             const selectedIds = Array.from(selectedRows);
             const title = document.getElementById('listTitle').value.trim();
-            
+
             if (!title) {
                 alert('Please enter a list title');
                 return;
             }
-            
+
             if (selectedIds.length === 0) {
                 alert('Please select POIs for the list');
                 return;
             }
-            
+
             try {
                 const response = await fetch(`/city/${encodeURIComponent('{{ city.name }}')}/lists/create/`, {
                     method: 'POST',
@@ -1049,7 +1051,7 @@
                         poi_ids: selectedIds
                     })
                 });
-                
+
                 const data = await response.json();
                 if (data.status === 'success') {
                     alert('List created successfully');
@@ -1071,7 +1073,7 @@
             if (!confirm(`Are you sure you want to delete "${poiName}"?`)) {
                 return;
             }
-            
+
             fetch(`/city/{{ city.name }}/poi/${poiId}/delete/`, {
                 method: 'DELETE'
             })
@@ -1082,12 +1084,12 @@
                 if (data.status === 'success') {
                     var row = document.querySelector('input[value="' + poiId + '"]').closest('tr');
                     row.remove();
-                    
+
                     var alert = document.createElement('div');
                     alert.className = 'alert alert-success';
                     alert.textContent = data.message;
                     document.querySelector('.container').insertBefore(alert, document.querySelector('.table-responsive'));
-                    
+
                     setTimeout(function() {
                         alert.remove();
                     }, 3000);
@@ -1111,16 +1113,16 @@
             const saveButton = cell.querySelector('.save-btn');
             const originalButton = button.textContent;
             const currentText = rewordedText.value;
-            
+
             // Set up auto-resize for the textarea
             rewordedText.addEventListener('input', () => autoResizeTextarea(rewordedText));
-            
+
             // Disable button and show loading state
             button.disabled = true;
             button.textContent = 'Rewording...';
             rewordedText.value = 'Generating...';
             autoResizeTextarea(rewordedText);
-            
+
             try {
                 const response = await fetch('/generate/reword/', {
                     method: 'POST',
@@ -1130,9 +1132,9 @@
                     },
                     body: `text=${encodeURIComponent(currentText)}&name=${encodeURIComponent(poiName)}&breif=true`
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.content) {
                     // Trim leading and trailing newlines but preserve internal ones
                     const trimmedContent = data.content.replace(/^\n+|\n+$/g, '');
@@ -1155,10 +1157,10 @@
         async function saveDescription(poiId, saveButton) {
             const cell = saveButton.closest('.description-cell');
             const rewordedText = cell.querySelector('.reworded').value;
-            
+
             saveButton.disabled = true;
             saveButton.textContent = 'Saving...';
-            
+
             try {
                 const response = await fetch(`/city/poi/${poiId}/update_description/`, {
                     method: 'POST',
@@ -1168,9 +1170,9 @@
                     },
                     body: `description=${encodeURIComponent(rewordedText)}`
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.status === 'success') {
                     // Success message or visual feedback could be added here
                 } else {
@@ -1189,7 +1191,7 @@
             const rewordedText = cell.querySelector('.reworded');
             const saveButton = cell.querySelector('.save-btn');
             const originalButton = button.textContent;
-            
+
             // Get coordinates from the row
             const row = button.closest('tr');
             const coordsCell = row.querySelector('td:nth-child(7)');
@@ -1201,16 +1203,16 @@
                     [lat, lon] = coords.map(c => c.trim());
                 }
             }
-            
+
             // Set up auto-resize for the textarea
             rewordedText.addEventListener('input', () => autoResizeTextarea(rewordedText));
-            
+
             // Disable button and show loading state
             button.disabled = true;
             button.textContent = 'Searching...';
             rewordedText.value = 'Searching Wikipedia...';
             autoResizeTextarea(rewordedText);
-            
+
             try {
                 const response = await fetch('/generate/wikipedia/', {
                     method: 'POST',
@@ -1220,9 +1222,9 @@
                     },
                     body: `query=${poiName}${lat ? `&lat=${lat}` : ''}${lon ? `&lon=${lon}` : ''}`
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.summary) {
                     rewordedText.value = data.summary;
                     autoResizeTextarea(rewordedText);
@@ -1248,7 +1250,7 @@
             const rewordedText = cell.querySelector('.reworded');
             const saveButton = cell.querySelector('.save-btn');
             const originalButton = button.textContent;
-            
+
             // Get coordinates from the row
             const row = button.closest('tr');
             const coordsCell = row.querySelector('td:nth-child(7)');
@@ -1260,16 +1262,16 @@
                     [lat, lon] = coords.map(c => c.trim());
                 }
             }
-            
+
             // Set up auto-resize for the textarea
             rewordedText.addEventListener('input', () => autoResizeTextarea(rewordedText));
-            
+
             // Disable button and show loading state
             button.disabled = true;
             button.textContent = 'Searching Wiki...';
             rewordedText.value = 'Searching Wikipedia...';
             autoResizeTextarea(rewordedText);
-            
+
             try {
                 // First get Wikipedia content
                 const wikiResponse = await fetch('/generate/wikipedia/', {
@@ -1280,20 +1282,20 @@
                     },
                     body: `query=${poiName}${lat ? `&lat=${lat}` : ''}${lon ? `&lon=${lon}` : ''}`
                 });
-                
+
                 const wikiData = await wikiResponse.json();
-                
+
                 if (!wikiData.summary) {
                     rewordedText.value = 'No Wikipedia article found.';
                     autoResizeTextarea(rewordedText);
                     return;
                 }
-                
+
                 // Now feed that to the generate endpoint
                 button.textContent = 'Generating...';
                 rewordedText.value = 'Generating from Wikipedia content...';
                 autoResizeTextarea(rewordedText);
-                
+
                 const generateResponse = await fetch('/generate/reword/', {
                     method: 'POST',
                     headers: {
@@ -1302,9 +1304,9 @@
                     },
                     body: `text=${encodeURIComponent(wikiData.summary)}&name=${encodeURIComponent(poiName)}&breif=true`
                 });
-                
+
                 const generateData = await generateResponse.json();
-                
+
                 if (generateData.content) {
                     // Trim leading and trailing newlines but preserve internal ones
                     const trimmedContent = generateData.content.replace(/^\n+|\n+$/g, '');
@@ -1329,16 +1331,16 @@
             const rewordedText = cell.querySelector('.reworded');
             const saveButton = cell.querySelector('.save-btn');
             const originalButton = button.textContent;
-            
+
             // Set up auto-resize for the textarea
             rewordedText.addEventListener('input', () => autoResizeTextarea(rewordedText));
-            
+
             // Disable button and show loading state
             button.disabled = true;
             button.textContent = 'Searching...';
             rewordedText.value = 'Searching Wikipedia...';
             autoResizeTextarea(rewordedText);
-            
+
             try {
                 const response = await fetch('/generate/wikipedia/', {
                     method: 'POST',
@@ -1348,9 +1350,9 @@
                     },
                     body: `query=${poiName}`
                 });
-                
+
                 const wikiData = await response.json();
-                
+
                 if (wikiData.summary) {
                     rewordedText.value = wikiData.summary;
                     autoResizeTextarea(rewordedText);
@@ -1382,7 +1384,7 @@
                 return;
             }
 
-            let deletePromises = selectedIds.map(poiId => 
+            let deletePromises = selectedIds.map(poiId =>
                 fetch(`/city/{{ city.name }}/poi/${poiId}/delete/`, {
                     method: 'DELETE'
                 }).then(response => response.json())
@@ -1428,4 +1430,4 @@
     </script>
 {% else %}
     <p>No points of interest in this category.</p>
-{% endif %} 
+{% endif %}
