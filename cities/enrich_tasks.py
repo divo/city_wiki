@@ -541,6 +541,50 @@ def fetch_osm_ids(city_id):
         logger.error(f"Error in fetch_osm_ids task: {str(e)}")
         raise
 
+def load_osm_data_from_pbf(pbf_file):
+    """
+    Load OSM data from PBF file including POIs and buildings, with preprocessing.
+    
+    Args:
+        pbf_file: Path to the local OSM PBF file
+        
+    Returns:
+        tuple: (osm_pois_4326, osm_pois_3857) - OSM data in WGS84 and Web Mercator projections
+    """
+    from pyrosm import OSM
+    import pandas as pd
+    
+    # Initialize Pyrosm and load the data
+    logger.info("Loading OSM data with Pyrosm...")
+    osm = OSM(pbf_file)
+
+    # Load multiple types of OSM data
+    osm_pois = osm.get_pois()
+    logger.info(f"Loaded {len(osm_pois)} POIs from OSM")
+
+    # Also load buildings which might contain POIs
+    try:
+        osm_buildings = osm.get_buildings()
+        logger.info(f"Loaded {len(osm_buildings)} buildings from OSM")
+        # Combine POIs and buildings
+        osm_pois = pd.concat([osm_pois, osm_buildings], ignore_index=True)
+        logger.info(f"Combined total: {len(osm_pois)} OSM features")
+    except Exception as e:
+        logger.warning(f"Could not load buildings: {e}")
+
+    # Remove duplicates based on ID if any and reset indices
+    osm_pois = osm_pois.drop_duplicates(subset=['id'], keep='first').reset_index(drop=True)
+
+    # Ensure OSM POIs are in WGS 84
+    osm_pois = osm_pois.to_crs("EPSG:4326")
+
+    # Pre-project OSM data to Web Mercator for efficient distance calculations
+    logger.info("Projecting OSM data to Web Mercator for distance calculations...")
+    osm_projected = osm_pois.to_crs("EPSG:3857")
+    
+    return osm_pois, osm_projected
+
+
 def find_best_name_match_from_nearby(poi_name, nearby_osm_pois, threshold=60):
     """
     Given multiple nearby OSM POIs, find the one with the best name match using thefuzz fuzzy matching.
@@ -744,7 +788,7 @@ def find_closest_osm_poi(poi_lat, poi_lon, osm_pois, osm_projected, radius_meter
 
 
 @shared_task
-def find_osm_ids_local(city_id, pbf_file=None):
+def find_osm_ids_local(city_id, pois=None, pbf_file=None):
     """
     Find POIs without OSM IDs by searching a local OSM PBF file using Pyrosm.
     Searches for nodes within 5 meters of each POI's coordinates.
@@ -766,13 +810,8 @@ def find_osm_ids_local(city_id, pbf_file=None):
         city = City.objects.get(id=city_id)
         logger.info(f"Starting local OSM ID lookup for {city.name} using PBF file: {pbf_file}")
 
-        # Get POIs without OSM IDs but with coordinates
-        pois = PointOfInterest.objects.filter(
-            city=city,
-            osm_id__isnull=True,
-            latitude__isnull=False,
-            longitude__isnull=False
-        )
+        if pois is None:
+            raise ValueError("POIs parameter is required")
 
         total_pois = pois.count()
         if total_pois == 0:
@@ -786,33 +825,8 @@ def find_osm_ids_local(city_id, pbf_file=None):
 
         logger.info(f"Found {total_pois} POIs to process in {city.name}")
 
-        # Initialize Pyrosm and load the data
-        logger.info("Loading OSM data with Pyrosm...")
-        osm = OSM(pbf_file)
-
-        # Load multiple types of OSM data
-        osm_pois = osm.get_pois()
-        logger.info(f"Loaded {len(osm_pois)} POIs from OSM")
-
-        # Also load buildings which might contain POIs
-        try:
-            osm_buildings = osm.get_buildings()
-            logger.info(f"Loaded {len(osm_buildings)} buildings from OSM")
-            # Combine POIs and buildings
-            osm_pois = pd.concat([osm_pois, osm_buildings], ignore_index=True)
-            logger.info(f"Combined total: {len(osm_pois)} OSM features")
-        except Exception as e:
-            logger.warning(f"Could not load buildings: {e}")
-
-        # Remove duplicates based on ID if any and reset indices
-        osm_pois = osm_pois.drop_duplicates(subset=['id'], keep='first').reset_index(drop=True)
-
-        # Ensure OSM POIs are in WGS 84
-        osm_pois = osm_pois.to_crs("EPSG:4326")
-
-        # Pre-project OSM data to Web Mercator for efficient distance calculations
-        logger.info("Projecting OSM data to Web Mercator for distance calculations...")
-        osm_projected = osm_pois.to_crs("EPSG:3857")
+        # Load OSM data
+        osm_pois, osm_projected = load_osm_data_from_pbf(pbf_file)
 
         # Process each POI
         processed_count = 0
