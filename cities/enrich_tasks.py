@@ -541,75 +541,76 @@ def fetch_osm_ids(city_id):
         logger.error(f"Error in fetch_osm_ids task: {str(e)}")
         raise
 
-def find_best_name_match_from_nearby(poi_name, nearby_osm_pois, threshold=0.6):
+def find_best_name_match_from_nearby(poi_name, nearby_osm_pois, threshold=60):
     """
-    Given multiple nearby OSM POIs, find the one with the best name match using vectorized fuzzy matching.
-    
+    Given multiple nearby OSM POIs, find the one with the best name match using thefuzz fuzzy matching.
+
     Args:
         poi_name: Name of the target POI
         nearby_osm_pois: DataFrame of nearby OSM POIs
-        threshold: Minimum similarity score (0-1)
-    
+        threshold: Minimum similarity score (0-100, thefuzz uses 0-100 scale)
+
     Returns the best matching row or None if no good match found.
     """
-    from difflib import SequenceMatcher
+    from thefuzz import fuzz
     import pandas as pd
-    
+
     if poi_name is None or poi_name.strip() == "":
         return None
-        
-    poi_name_clean = poi_name.lower().strip()
-    
-    # Vectorized approach: collect all potential names for each POI
+
+    poi_name_clean = poi_name.strip()
+
+    # Name fields to check in order of preference
     name_fields = ['name', 'name:en', 'brand', 'addr:housename']
-    
+
     best_score = 0
     best_match = None
-    
+
     # For each OSM POI, calculate the best score across all its name fields
     for idx in nearby_osm_pois.index:
         osm_poi = nearby_osm_pois.loc[idx]
         poi_best_score = 0
-        
+
         # Check each name field for this POI
         for field in name_fields:
             if field in osm_poi and pd.notna(osm_poi[field]):
-                osm_name_clean = str(osm_poi[field]).lower().strip()
-                if osm_name_clean:  # Only process non-empty names
-                    score = SequenceMatcher(None, poi_name_clean, osm_name_clean).ratio()
+                osm_name = str(osm_poi[field]).strip()
+                if osm_name:  # Only process non-empty names
+                    # Use token_sort_ratio for better handling of word order differences
+                    score = fuzz.token_sort_ratio(poi_name_clean, osm_name)
                     poi_best_score = max(poi_best_score, score)
-        
+
         # Update global best if this POI's score is better
         if poi_best_score > best_score and poi_best_score >= threshold:
             best_score = poi_best_score
             best_match = osm_poi
-                
+
     return best_match if best_score >= threshold else None
 
 
 def find_closest_osm_poi_optimized(target_point_projected, osm_pois, osm_projected, radius_meters=20, poi_name=None):
     """
     Find the closest OSM POI using pre-computed target projection.
-    
+
     Args:
         target_point_projected: Pre-projected target point geometry (EPSG:3857)
         osm_pois: GeoDataFrame of OSM POIs in EPSG:4326 (for tag extraction)
         osm_projected: GeoDataFrame of OSM POIs in EPSG:3857 (for distance calculation)
         radius_meters: Search radius in meters
         poi_name: Name of the target POI for name matching
-    
+
     Returns:
         tuple: (osm_id_string, distance_meters, tags_dict) or (None, None, None) if no match
     """
     import pandas as pd
-    
+
     try:
         # Calculate distances in meters using pre-projected data
         distances = osm_projected.geometry.distance(target_point_projected)
-        
+
         # Filter by radius
         within_radius_mask = distances <= radius_meters
-        
+
         if not within_radius_mask.any():
             return None, None, None
 
@@ -617,9 +618,19 @@ def find_closest_osm_poi_optimized(target_point_projected, osm_pois, osm_project
         nearby = osm_pois[within_radius_mask].copy()
         nearby['distance_meters'] = distances[within_radius_mask]
 
+        # Filter to only include nodes and ways (exclude relations)
+        if 'osm_type' in nearby.columns:
+            nearby = nearby[nearby['osm_type'].isin(['node', 'way'])]
+        elif 'type' in nearby.columns:
+            nearby = nearby[nearby['type'].isin(['node', 'way'])]
+
+        # Check if we still have results after filtering
+        if len(nearby) == 0:
+            return None, None, None
+
         # Sort by distance
         nearby = nearby.sort_values('distance_meters')
-        
+
         # If multiple results and we have a POI name, try name matching to find the best one
         if len(nearby) > 1 and poi_name:
             best_match = find_best_name_match_from_nearby(poi_name, nearby)
@@ -644,7 +655,7 @@ def find_closest_osm_poi_optimized(target_point_projected, osm_pois, osm_project
 
         # Extract tags for logging (exclude technical columns)
         exclude_cols = {'geometry', 'id', 'distance_meters', 'type', 'osm_type', 'version', 'timestamp', 'visible'}
-        tags = {col: closest[col] for col in closest.index 
+        tags = {col: closest[col] for col in closest.index
                 if pd.notna(closest[col]) and col not in exclude_cols}
 
         return osm_id_string, closest['distance_meters'], tags
@@ -685,7 +696,7 @@ def find_closest_osm_poi(poi_lat, poi_lon, osm_pois, osm_projected, radius_meter
 
         # Filter by radius
         within_radius_mask = distances <= radius_meters
-        
+
         if not within_radius_mask.any():
             return None, None, None
 
@@ -695,7 +706,7 @@ def find_closest_osm_poi(poi_lat, poi_lon, osm_pois, osm_projected, radius_meter
 
         # Sort by distance
         nearby = nearby.sort_values('distance_meters')
-        
+
         # If multiple results and we have a POI name, try name matching to find the best one
         if len(nearby) > 1 and poi_name:
             best_match = find_best_name_match_from_nearby(poi_name, nearby)
@@ -778,11 +789,11 @@ def find_osm_ids_local(city_id, pbf_file=None):
         # Initialize Pyrosm and load the data
         logger.info("Loading OSM data with Pyrosm...")
         osm = OSM(pbf_file)
-        
+
         # Load multiple types of OSM data
         osm_pois = osm.get_pois()
         logger.info(f"Loaded {len(osm_pois)} POIs from OSM")
-        
+
         # Also load buildings which might contain POIs
         try:
             osm_buildings = osm.get_buildings()
@@ -792,7 +803,7 @@ def find_osm_ids_local(city_id, pbf_file=None):
             logger.info(f"Combined total: {len(osm_pois)} OSM features")
         except Exception as e:
             logger.warning(f"Could not load buildings: {e}")
-            
+
         # Remove duplicates based on ID if any and reset indices
         osm_pois = osm_pois.drop_duplicates(subset=['id'], keep='first').reset_index(drop=True)
 
@@ -808,18 +819,18 @@ def find_osm_ids_local(city_id, pbf_file=None):
         updated_count = 0
 
         logger.info(f"Found {len(pois)} POIs to process in {city.name}")
-        
+
         # Pre-compute all target projections to avoid repeated coordinate transformations
         logger.info("Pre-computing POI coordinate projections...")
         poi_coords = [(poi.latitude, poi.longitude, poi.name, poi.id) for poi in pois]
-        
+
         from shapely.geometry import Point
         import geopandas as gpd
-        
+
         # Create all target points at once
         target_points = [Point(lon, lat) for lat, lon, name, poi_id in poi_coords]
         target_gdf = gpd.GeoDataFrame(
-            {"geometry": target_points, "poi_name": [name for lat, lon, name, poi_id in poi_coords], "poi_id": [poi_id for lat, lon, name, poi_id in poi_coords]}, 
+            {"geometry": target_points, "poi_name": [name for lat, lon, name, poi_id in poi_coords], "poi_id": [poi_id for lat, lon, name, poi_id in poi_coords]},
             crs="EPSG:4326"
         )
         target_projected = target_gdf.to_crs("EPSG:3857")
@@ -828,10 +839,10 @@ def find_osm_ids_local(city_id, pbf_file=None):
             try:
                 # Use pre-computed projection for this POI
                 target_point_projected = target_projected.iloc[i]
-                
+
                 # Single search with 20m radius (prioritizes closer matches and better name matches)
                 osm_id_string, distance_meters, tags = find_closest_osm_poi_optimized(
-                    target_point_projected.geometry, osm_pois, osm_projected, radius_meters=20, poi_name=poi.name
+                    target_point_projected.geometry, osm_pois, osm_projected, poi_name=poi.name
                 )
 
                 if osm_id_string:
