@@ -813,7 +813,7 @@ def find_osm_ids_local(city_id, pois=None, pbf_file=None):
         if pois is None:
             raise ValueError("POIs parameter is required")
 
-        total_pois = pois.count()
+        total_pois = len(pois) if isinstance(pois, list) else pois.count()
         if total_pois == 0:
             logger.info(f"No POIs in {city.name} need OSM IDs")
             return {
