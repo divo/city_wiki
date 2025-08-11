@@ -10,6 +10,8 @@ django.setup()
 # Now import Django-related modules
 from django.db import models
 from prefect import flow, task, pause_flow_run, get_run_logger
+from prefect.futures import wait
+from prefect.task_runners import ThreadPoolTaskRunner
 from asgiref.sync import sync_to_async
 from cities.services.city_import import (
     fetch_city_pois,
@@ -23,7 +25,9 @@ from cities.enrich_tasks import (
     geocode_missing_addresses, 
     geocode_missing_coordinates,
     find_all_duplicates,
-    auto_merge_duplicates
+    auto_merge_duplicates,
+    find_osm_ids_local,
+    load_osm_data_from_pbf
 )
 from cities.models import City
 
@@ -381,6 +385,133 @@ async def _find_duplicates(name: str, result: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
+async def _get_pois_needing_osm_ids(name: str) -> List:
+    """
+    Get POIs that need OSM IDs (have coordinates but no OSM ID).
+    
+    Args:
+        name: Name of the city
+        
+    Returns:
+        List of POI objects needing OSM IDs
+    """
+    logger = get_run_logger()
+    logger.info(f"Getting POIs needing OSM IDs for {name}")
+    
+    try:
+        # Get the city and its POIs that need OSM IDs
+        get_city = sync_to_async(City.objects.get, thread_sensitive=True)
+        city = await get_city(name=name)
+        
+        # Get POIs without OSM IDs but with coordinates
+        from cities.models import PointOfInterest
+        get_pois = sync_to_async(
+            lambda: list(PointOfInterest.objects.filter(
+                city=city,
+                osm_id__isnull=True,
+                latitude__isnull=False,
+                longitude__isnull=False
+            )),
+            thread_sensitive=True
+        )
+        pois = await get_pois()
+        
+        logger.info(f"Found {len(pois)} POIs needing OSM IDs in {name}")
+        return pois
+        
+    except City.DoesNotExist:
+        logger.error(f"City {name} not found in database")
+        return []
+    except Exception as e:
+        logger.error(f"Error getting POIs for OSM ID lookup: {str(e)}")
+        return []
+
+
+def _chunk_pois(pois: List, chunk_size: int = 100) -> List[List]:
+    """
+    Split POIs into chunks of the specified size.
+    
+    Args:
+        pois: List of POI objects
+        chunk_size: Size of each chunk
+        
+    Returns:
+        List of POI chunks
+    """
+    chunks = []
+    for i in range(0, len(pois), chunk_size):
+        chunk = pois[i:i + chunk_size]
+        chunks.append(chunk)
+    return chunks
+
+
+@task(name="find_osm_ids_chunk", retries=2)
+async def find_osm_ids_chunk(city_id: int, poi_chunk: List, pbf_file: str) -> Dict[str, Any]:
+    """
+    Find OSM IDs for a chunk of POIs.
+    
+    Args:
+        city_id: ID of the city
+        poi_chunk: Chunk of POI objects
+        pbf_file: Path to the OSM PBF file
+        
+    Returns:
+        Dictionary with processing results
+    """
+    logger = get_run_logger()
+    logger.info(f"Processing chunk of {len(poi_chunk)} POIs for city {city_id}")
+    
+    try:
+        # Call the task function
+        find_osm_async = sync_to_async(find_osm_ids_local, thread_sensitive=True)
+        result = await find_osm_async(city_id, poi_chunk, pbf_file)
+        
+        logger.info(f"Processed chunk: {result.get('processed_count', 0)} POIs, "
+                   f"found {result.get('updated_count', 0)} OSM IDs")
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error processing POI chunk: {str(e)}")
+        return {
+            'status': 'error', 
+            'message': str(e),
+            'processed_count': 0,
+            'updated_count': 0
+        }
+
+
+async def _prepare_osm_chunks(name: str) -> List[List]:
+    """
+    Get POIs that need OSM IDs and split them into chunks for parallel processing.
+    
+    Args:
+        name: Name of the city
+        
+    Returns:
+        List of POI chunks ready for parallel processing
+    """
+    logger = get_run_logger()
+    
+    try:
+        # Get POIs that need OSM IDs
+        pois = await _get_pois_needing_osm_ids(name)
+        
+        if not pois:
+            logger.info(f"No POIs need OSM IDs in {name}")
+            return []
+        
+        # Split POIs into chunks of 100
+        poi_chunks = _chunk_pois(pois, chunk_size=100)
+        
+        logger.info(f"Prepared {len(pois)} POIs in {len(poi_chunks)} chunks of up to 100 for parallel processing")
+        
+        return poi_chunks
+        
+    except Exception as e:
+        logger.error(f"Error preparing OSM chunks for {name}: {str(e)}")
+        return []
+
+
 async def _auto_merge_duplicates(name: str, result: Dict[str, Any]) -> Dict[str, Any]:
     """
     Automatically merge duplicate POIs using best-value logic.
@@ -504,12 +635,24 @@ def _format_geocoding_confirmation_message(name: str, result: Dict[str, Any]) ->
         errors = len(result.get('auto_merge', {}).get('errors', []))
         merge_msg = f"Auto-merged {merged} out of {total} duplicate pairs ({errors} errors)."
 
-    message = (f"Geocoding and deduplication complete for {name}.\n\n"
+    # OSM ID info
+    osm_msg = ""
+    if result.get('osm_ids', {}).get('status') == 'success':
+        updated = result.get('osm_ids', {}).get('updated_count', 0)
+        processed = result.get('osm_ids', {}).get('processed_count', 0)
+        chunks = result.get('osm_ids', {}).get('successful_chunks', 0)
+        total_chunks = result.get('osm_ids', {}).get('chunks', 0)
+        osm_msg = f"Found OSM IDs for {updated} out of {processed} POIs using {chunks}/{total_chunks} parallel chunks."
+    elif result.get('osm_ids', {}).get('status') == 'skipped':
+        osm_msg = "OSM ID lookup skipped (no PBF file provided)."
+
+    message = (f"Geocoding, deduplication, and OSM matching complete for {name}.\n\n"
               f"{city_msg}\n"
               f"{address_msg}\n"
               f"{coord_msg}\n"
               f"{dup_msg}{duplicate_list}\n"
               f"{merge_msg}\n"
+              f"{osm_msg}\n"
               f"Would you like to continue with the import process?")
 
     return message
@@ -554,13 +697,14 @@ async def _get_user_confirmation(message: str, result: Dict[str, Any], step: str
     return result
 
 
-@flow(name="import_city", version="1.0")
-async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
+@flow(name="import_city", version="1.0", task_runner=ThreadPoolTaskRunner(max_workers=4))
+async def import_city(name: str, pbf_file: str = None, max_depth: int = 2) -> Dict[str, Any]:
     """
-    Import a city and its districts from Wikivoyage.
+    Import a city and its districts from Wikivoyage, with optional OSM ID matching.
     
     Args:
         name: Name of the city to import
+        pbf_file: Path to OSM PBF file for finding OSM IDs (optional)
         max_depth: Maximum depth to recurse for districts
         
     Returns:
@@ -597,10 +741,71 @@ async def import_city(name: str, max_depth: int = 2) -> Dict[str, Any]:
         # Step 8: Auto-merge duplicate POIs
         result = await _auto_merge_duplicates(name, result)
         
-        # Step 9: Format geocoding confirmation message
+        # Step 9: Find OSM IDs if PBF file is provided
+        if pbf_file:
+            logger.info(f"PBF file provided: {pbf_file}, starting OSM ID lookup")
+            
+            # Get the city ID
+            get_city = sync_to_async(City.objects.get, thread_sensitive=True)
+            city = await get_city(name=name)
+            
+            # Prepare POI chunks for parallel processing
+            poi_chunks = await _prepare_osm_chunks(name)
+            
+            if poi_chunks:
+                # Submit tasks in parallel
+                futures = []
+                for chunk in poi_chunks:
+                    future = find_osm_ids_chunk.submit(city.id, chunk, pbf_file)
+                    futures.append(future)
+                
+                # Wait for all futures to complete
+                wait(futures)
+                
+                # Aggregate results
+                total_processed = 0
+                total_updated = 0
+                successful_chunks = 0
+                errors = []
+                
+                for i, future in enumerate(futures):
+                    try:
+                        chunk_result = future.result()
+                        if chunk_result and chunk_result.get('status') == 'success':
+                            successful_chunks += 1
+                            total_processed += chunk_result.get('processed_count', 0)
+                            total_updated += chunk_result.get('updated_count', 0)
+                        else:
+                            error_msg = chunk_result.get('message', 'Unknown error') if chunk_result else 'Task failed'
+                            errors.append(f"Chunk {i+1}: {error_msg}")
+                    except Exception as e:
+                        logger.error(f"Chunk {i+1} failed with exception: {str(e)}")
+                        errors.append(f"Chunk {i+1}: {str(e)}")
+                
+                result['osm_ids'] = {
+                    'status': 'success' if successful_chunks > 0 else 'error',
+                    'message': f'Processed {len(poi_chunks)} chunks, {successful_chunks} successful',
+                    'total_pois': sum(len(chunk) for chunk in poi_chunks),
+                    'chunks': len(poi_chunks),
+                    'successful_chunks': successful_chunks,
+                    'processed_count': total_processed,
+                    'updated_count': total_updated,
+                    'errors': errors
+                }
+                
+                logger.info(f"OSM ID lookup complete for {name}: "
+                           f"{total_updated}/{total_processed} POIs matched, "
+                           f"{successful_chunks}/{len(poi_chunks)} chunks successful")
+            else:
+                result['osm_ids'] = {'status': 'success', 'message': 'No POIs need OSM IDs'}
+        else:
+            logger.info("No PBF file provided, skipping OSM ID lookup")
+            result['osm_ids'] = {'status': 'skipped', 'message': 'No PBF file provided'}
+        
+        # Step 10: Format geocoding confirmation message
         message = _format_geocoding_confirmation_message(name, result)
         
-        # Step 10: Get final user confirmation
+        # Step 11: Get final user confirmation
         result = await _get_user_confirmation(message, result, step="geocoding")
     else:
         logger.info(f"User did not confirm import for {name}, skipping geocoding steps")
