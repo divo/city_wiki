@@ -35,27 +35,28 @@ def main():
     parser = argparse.ArgumentParser(description='Run city import workflow')
     parser.add_argument('--city', required=True, help='Name of city to import')
     parser.add_argument('--depth', type=int, default=2, help='Maximum depth for district recursion')
-    
+    parser.add_argument('--pbf', type=str, help='Path to PBF file')
+
     args = parser.parse_args()
-    
+
     # Log start of workflow
     start_time = datetime.now()
     logger.info(f"Starting import workflow for {args.city} at {start_time}")
-    
+
     try:
         # Run the flow synchronously
-        result = import_city(name=args.city, max_depth=args.depth)
-        
+        result = import_city(name=args.city, max_depth=args.depth, pbf_file=args.pbf)
+
         # Log completion
         end_time = datetime.now()
         duration = end_time - start_time
-        
+
         if result.get('status') == 'success':
             logger.info(f"Workflow completed successfully in {duration}")
             stats = result.get('statistics', {})
             if stats:
                 logger.info(f"Imported {stats.get('total_pois', 0)} POIs for {args.city}")
-                
+
                 # Print any validation warnings
                 warnings = stats.get('validation', {}).get('warnings', [])
                 if warnings:
@@ -64,11 +65,11 @@ def main():
                         logger.warning(f"  - {warning}")
         else:
             logger.error(f"Workflow failed: {result.get('error', 'Unknown error')}")
-            
+
     except Exception as e:
         logger.exception(f"Error running workflow: {str(e)}")
         return 1
-        
+
     return 0
 
 
