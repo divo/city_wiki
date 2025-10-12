@@ -16,7 +16,7 @@ def edit_content_view(request):
     """Render the edit content interface."""
     # Get all cities for the dropdown
     cities = City.objects.all().order_by('name')
-    
+
     # Prepare city data with POI lists for JavaScript
     city_data = []
     for city in cities:
@@ -29,13 +29,13 @@ def edit_content_view(request):
                 'title': poi_list.title,
                 'pois': list(pois)
             })
-        
+
         city_data.append({
             'id': city.id,
             'name': city.name,
             'poi_lists': poi_list_data
         })
-    
+
     return render(request, 'cities/edit_content.html', {
         'cities': cities,  # For the initial city dropdown
         'city_data_json': json.dumps(city_data, cls=DjangoJSONEncoder)  # For JavaScript
@@ -71,7 +71,7 @@ def edit_content_view(request):
 #            ]
 #
 #            f.write(f"Sending chat request with messages: {messages}\n")
-#            response = requests.post('http://localhost:8080/v1/chat/completions', 
+#            response = requests.post('http://localhost:8080/v1/chat/completions',
 #                json={
 #                    "messages": messages,
 #                    "temperature": 0.7,
@@ -85,10 +85,10 @@ def edit_content_view(request):
 #
 #            response.raise_for_status()
 #            data = response.json()
-#            
+#
 #            # Clean up the response - chat completions return message content
 #            content = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-#            
+#
 #            f.write(f"Received reworded response: {content}\n")
 #            return JsonResponse({
 #                'content': content
@@ -113,7 +113,7 @@ def generate_reword(request):
         text = request.POST.get('text', '')
         name = request.POST.get('name', '')
         breif = request.POST.get('breif', False)
-        
+
         if not name:
             return JsonResponse({
                 'status': 'error',
@@ -121,7 +121,7 @@ def generate_reword(request):
             }, status=400)
 
         client = Groq(api_key=os.environ.get('GROQ_KEY'))
-        
+
         # Different prompts based on whether we're rewriting or creating new
         if text.strip():
             # Rewriting existing description
@@ -169,7 +169,7 @@ def generate_reword(request):
             messages[0]['content'] = messages[0]['content'] + " Keep the description to 100 words or less."
 
         completion = client.chat.completions.create(
-            model="deepseek-r1-distill-llama-70b",
+            model="llama-3.3-70b-versatile",
             messages=messages,
             temperature=0.6,
             max_completion_tokens=4096,
@@ -177,12 +177,12 @@ def generate_reword(request):
             stream=False,
             stop=None
         )
-        
+
         content = completion.choices[0].message.content
-        
+
         # Strip out thinking process
         content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
-        
+
         return JsonResponse({
             'content': content
         })
@@ -190,7 +190,7 @@ def generate_reword(request):
         return JsonResponse({
             'status': 'error',
             'message': str(e)
-        }, status=500) 
+        }, status=500)
 
 @require_http_methods(["POST"])
 def update_poi_description(request, poi_id):
@@ -198,16 +198,16 @@ def update_poi_description(request, poi_id):
     try:
         poi = get_object_or_404(PointOfInterest, id=poi_id)
         description = request.POST.get('description', '').strip()
-        
+
         if not description:
             return JsonResponse({
                 'status': 'error',
                 'message': 'No description provided'
             }, status=400)
-        
+
         poi.description = description
         poi.save()
-        
+
         return JsonResponse({
             'status': 'success',
             'message': 'Description updated successfully'
@@ -216,7 +216,7 @@ def update_poi_description(request, poi_id):
         return JsonResponse({
             'status': 'error',
             'message': str(e)
-        }, status=500) 
+        }, status=500)
 
 @require_http_methods(["POST"])
 def generate_wikipedia(request):
@@ -228,9 +228,9 @@ def generate_wikipedia(request):
                 'status': 'error',
                 'message': 'No search query provided'
             }, status=400)
-        
+
         result = search_wikipedia(query)
-        
+
         if result['summary']:
             return JsonResponse({
                 'summary': result['summary'],
@@ -241,7 +241,7 @@ def generate_wikipedia(request):
                 'status': 'error',
                 'message': 'No Wikipedia article found'
             }, status=404)
-            
+
     except Exception as e:
         return JsonResponse({
             'status': 'error',
