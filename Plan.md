@@ -1,6 +1,6 @@
 # Running
 source .venv/bin/activate
-python manage.py runserver
+uv run manage.py runserver
 redis-server
 celery -A city_wiki worker -l INFO --pool=solo -P solo
 
@@ -30,3 +30,10 @@ workflow/city_import.py#import_city is what ties it all together
 - [ ] Cleanup all the descriptions using LLM
 
 Next is finding OSM ids. I need to lookup how to do that using local archive, else it will get very expensive. What was that archive? Where do I get it and how do I interact with it?
+
+The archive is a PBF file. PBF files are Geofabrik databases and can be obtained from [Geofabrik](https://download.geofabrik.de/).
+To execute the ODM ID task, pass the PBF file as an arg: { "pbf_file": "./pbf/greater-london-latest.osm.pbf" }
+Test a ODM id is correct by taking the "node/<int_id>" and using https://www.openstreetmap.org/node/<int_id>
+Currently very broken, wrong by hundreds of miles. -> Ok, it was the wrong coordinate system
+Now creating the prefect workflow. Claude wrote a lot of code in one go.
+Use absolute paths for the PBF file.
