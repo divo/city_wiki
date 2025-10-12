@@ -18,46 +18,86 @@ logger = logging.getLogger(__name__)
 def _fetch_wikimedia_images(search_query, limit=10):
     """Helper function to fetch images from Wikimedia Commons."""
     try:
+        logger.info(f"Fetching Wikimedia images for query: {search_query}")
+
+        # Add headers to comply with Wikimedia API requirements
+        headers = {
+            'User-Agent': 'CityWikiApp/1.0 (https://github.com/yourusername/city_wiki; contact@example.com)'
+        }
+
         # Format and encode search query
         search_query = search_query.replace(' ', '+')
         api_url = f"https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch={search_query}&srnamespace=6&format=json&origin=*&srlimit={limit}"
+        logger.info(f"Making request to Wikimedia API: {api_url}")
 
-        response = requests.get(api_url)
+        response = requests.get(api_url, headers=headers)
+        logger.info(f"Wikimedia API response status code: {response.status_code}")
+        
+        if response.status_code != 200:
+            logger.error(f"Wikimedia API error: {response.text}")
+            return {
+                'status': 'error',
+                'message': f'Wikimedia API error: {response.status_code}'
+            }
+
         data = response.json()
+        search_results = data.get('query', {}).get('search', [])
+        logger.info(f"Wikimedia API response: {len(search_results)} search results")
 
         image_urls = []
-        if data.get('query', {}).get('search'):
+        if search_results:
             # Get up to limit results
-            for result in data['query']['search'][:limit]:
+            for i, result in enumerate(search_results[:limit]):
                 title = result['title']
+                logger.info(f"Processing Wikimedia result {i+1}: {title}")
 
                 # Get image info for each result
                 file_url = f"https://commons.wikimedia.org/w/api.php?action=query&titles={title}&prop=imageinfo&iiprop=url&format=json&origin=*"
-                file_response = requests.get(file_url)
-                file_data = file_response.json()
+                try:
+                    file_response = requests.get(file_url, headers=headers)
+                    if file_response.status_code != 200:
+                        logger.warning(f"Failed to get image info for {title}: {file_response.status_code}")
+                        continue
+                        
+                    file_data = file_response.json()
 
-                # Extract the image URL
-                pages = file_data.get('query', {}).get('pages', {})
-                if pages:
-                    page = next(iter(pages.values()))
-                    image_info = page.get('imageinfo', [{}])[0]
-                    image_url = image_info.get('url')
-
-                    if image_url:
-                        image_urls.append(image_url)
+                    # Extract the image URL
+                    pages = file_data.get('query', {}).get('pages', {})
+                    if pages:
+                        page = next(iter(pages.values()))
+                        image_info = page.get('imageinfo', [])
+                        
+                        if image_info and len(image_info) > 0:
+                            image_url = image_info[0].get('url')
+                            if image_url:
+                                logger.info(f"Found image URL: {image_url}")
+                                image_urls.append(image_url)
+                            else:
+                                logger.warning(f"No URL found in image info for {title}")
+                        else:
+                            logger.warning(f"No image info found for {title}")
+                    else:
+                        logger.warning(f"No pages found for {title}")
+                except Exception as e:
+                    logger.error(f"Error processing image {title}: {str(e)}")
+                    continue
 
             if image_urls:
+                logger.info(f"Found {len(image_urls)} images from Wikimedia")
                 return {
                     'status': 'success',
                     'message': 'Image URLs found',
                     'image_urls': image_urls
                 }
+        
+        logger.warning("No images found in Wikimedia response")
         return {
             'status': 'error',
             'message': 'No suitable images found'
         }
 
     except Exception as e:
+        logger.exception(f"Error fetching images from Wikimedia: {str(e)}")
         return {
             'status': 'error',
             'message': str(e)
