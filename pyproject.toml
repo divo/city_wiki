@@ -1,6 +1,7 @@
 [project]
 name = ""
 version = "0.0.1"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "django>=4.2.0",
     "django-reversion>=5.0.0",
@@ -22,6 +23,11 @@ dependencies = [
     "redis>=6.2.0",
     "pyrosm>=0.6.2",
     "thefuzz>=0.22.1",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "transformers>=4.30.0",
+    "ftfy>=6.1.0",
+    "regex>=2023.0.0",
 ]
 
 [tool.uv]
