@@ -1,12 +1,14 @@
-cities/__pycache__
-city_wiki/__pycache__
-data_processing/__pycache__
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Data files
 dump.rdb
 debug.log
+pbf
 
 # Environment variables
 .env
 .env.*
-cities/views/__pycache__
-pbf
 .aider*
