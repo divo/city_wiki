@@ -56,7 +56,7 @@ class CityImportServiceTestCase(TestCase):
         
         # Setup mock to raise APIError
         mock_scraper = MagicMock()
-        mock_scraper.get_city_data.side_effect = APIError("API Error")
+        mock_scraper.get_city_data.side_effect = APIError('error', 'API Error', {})
         mock_scraper_class.return_value = mock_scraper
         
         # Call function
@@ -73,7 +73,7 @@ class CityImportServiceTestCase(TestCase):
             aggregate='FetchArticleError',
             specialized_aggregate='CityFetchError'
         )
-        self.assertEqual(validation.description, "API Error")
+        self.assertEqual(validation.description, "error: API Error -- {}")
 
     def test_create_or_update_city(self):
         """Test creating and updating a city."""
